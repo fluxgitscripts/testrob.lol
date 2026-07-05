@@ -384,11 +384,11 @@ task.spawn(function()
                 })
 
                 local plr = game:GetService("Players").LocalPlayer
-                local buyRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("29c2c390-e58d-4512-9180-2da58f0d98d8")
-                local EquipRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("b16cb2a5-7735-4e84-a72b-22718da109fc")
-                local fireBombRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("66291b15-ebda-4dbd-964e-cc89f86d2c82")
-                local robRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("a3126821-130a-4135-80e1-1d28cece4007")
-                local sellRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("eb233e6a-acb9-4169-acb9-129fe8cb06bb")
+                local buyRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("7db6464e-0b73-4c83-9aff-024b292865b6")
+                local EquipRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("5fca12bf-61ba-4240-bdf1-ca8de18d361f")
+                local fireBombRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("88897716-05bb-403a-913b-d168ccd6cddf")
+                local robRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("dbb557a2-5175-41d2-a557-1a22b4880b87")
+                local sellRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("d7052636-7370-4c6e-b9da-4693cd4159dc")
                 local ProximityPromptTimeBet = 2.5
                 local VirtualInputManager = game:GetService("VirtualInputManager")
                 local key = Enum.KeyCode.E
