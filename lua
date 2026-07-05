@@ -7,13 +7,17 @@ local PlaceId = game.PlaceId
 local request = syn and syn.request or http and http.request or http_request or fluxus and fluxus.request or request
 local queue_on_teleport = syn and syn.queue_on_teleport or queue_on_teleport or fluxus and fluxus.queue_on_teleport
 
+
+
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 
+
 local SERVER_HISTORY_FILE = "Flux_ServerHistory.json"
 local MAX_HISTORY_SIZE = 20
+
 
 local function loadServerHistory()
     if isfile and isfile(SERVER_HISTORY_FILE) then
@@ -35,20 +39,24 @@ local function saveServerHistory(history)
     end
 end
 
+
 local function addCurrentServerToHistory()
     local currentJobId = game.JobId
     if not currentJobId then return end
     
     local history = loadServerHistory()
     
+
     for _, serverId in ipairs(history) do
         if serverId == currentJobId then
             return
         end
     end
     
+
     table.insert(history, 1, currentJobId)
     
+
     if #history > MAX_HISTORY_SIZE then
         table.remove(history)
     end
@@ -115,6 +123,7 @@ local function findNewServer()
     return nil
 end
 
+
 local function performServerHop()
     print("[ServerHop] Starting Serverhop...")
     
@@ -122,7 +131,7 @@ local function performServerHop()
     
     local payload = [[
         wait(3)
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/fluxgitscripts/Flux-Autorob/refs/heads/main/main.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/fluxgitscripts/testrob.lol/refs/heads/main/lua"))()
     ]]
     
     local q = queue_on_teleport or (syn and syn.queue_on_teleport)
@@ -131,8 +140,11 @@ local function performServerHop()
         print("[ServerHop] Auto-Execution for next Server set up.")
     end
 
-    player:Kick("Searching for new Server. ServerHop happens automatically...")                    
+
+
+    player:Kick("Made by zzkxnsti Searching for new Server. ServerHop happens automatically...")                    
 	task.wait(1.5)  
+
 
     local newServer = findNewServer()
     
@@ -145,7 +157,9 @@ local function performServerHop()
         
         if not success then
             warn("[ServerHop] Direct Teleport countered an error: " .. err)
+            
             task.wait(2)
+            
             pcall(function()
                 TeleportService:Teleport(game.PlaceId, player)
             end)
@@ -153,11 +167,13 @@ local function performServerHop()
     else
         print("[ServerHop] No Server found → Normal Teleport")
         task.wait(1)
+        
         pcall(function()
             TeleportService:Teleport(game.PlaceId, player)
         end)
     end
 end
+
 
 local function notify(title, text)
     StarterGui:SetCore("SendNotification", {
@@ -166,7 +182,6 @@ local function notify(title, text)
         Duration = 2 
     })
 end
-
 local PrisonMessageSent = false
 task.spawn(function()
     while true do
@@ -209,6 +224,7 @@ task.spawn(function()
                 })
 
                 AutoRobTab:AddParagraph("Important", 'Please read "Infos" before starting AutoRob!')
+
                 InfosTab:AddParagraph("Bomb Issue", "If you got the problem that it buys much bombs, please dont\nopen a ticket. Im working on it!")
 
                 local Section = InfosTab:AddSection({
@@ -377,6 +393,7 @@ task.spawn(function()
                 local VirtualInputManager = game:GetService("VirtualInputManager")
                 local key = Enum.KeyCode.E
                 local TweenService = game:GetService("TweenService")
+                local VirtualInputManager = game:GetService("VirtualInputManager")
 
                 local function checkForBomb()
                     if not bombDetectionEnabled then return false end
@@ -522,6 +539,7 @@ task.spawn(function()
                     local tween = TweenService:Create(TweenValue, TweenInfoToUse, { Value = targetCFrame })
 
                     tween:Play()
+
                     tween.Completed:Wait()
                     TweenValue:Destroy()
                 end
@@ -759,9 +777,12 @@ task.spawn(function()
                     end
                 end
 
+                -- ============================================================
+                -- NEUES TWEEN (instant drop auf Y=-5, dann linear zum Ziel)
+                -- ============================================================
                 local function tweenTo(destination)
                     local plr = game.Players.LocalPlayer
-                    local car = workspace.Vehicles[plr.Name]
+                    local car = Workspace.Vehicles[plr.Name]
 
                     car:SetAttribute("ParkingBrake", true)
                     car:SetAttribute("Locked", true)
@@ -770,6 +791,8 @@ task.spawn(function()
                     local driveSeat = car.DriveSeat
                     driveSeat:Sit(plr.Character.Humanoid)
 
+                    -- Step 1: INSTANT drop auf Y=-5, kein Tween
+                    -- Egal ob auf Gebäude Y=40 oder Boden Y=5 — sofort runter
                     local currentPivot = car:GetPivot()
                     local dropY = -5
                     car:PivotTo(CFrame.new(Vector3.new(currentPivot.X, dropY, currentPivot.Z)))
@@ -777,6 +800,7 @@ task.spawn(function()
                     driveSeat.AssemblyAngularVelocity = Vector3.zero
                     task.wait(0.05)
 
+                    -- Step 2: Linear tween von Y=-5 direkt zum Ziel, konstante Geschwindigkeit
                     local startPos = Vector3.new(currentPivot.X, dropY, currentPivot.Z)
                     local distance = (startPos - destination).Magnitude
 
@@ -795,6 +819,7 @@ task.spawn(function()
 
                         TweenValue.Changed:Connect(function(newCFrame)
                             car:PivotTo(newCFrame)
+                            -- Minimaler Jitter für natürlicheres Verhalten
                             local jitter = Vector3.new(
                                 (math.random() - 0.5) * 0.08,
                                 0,
@@ -815,6 +840,7 @@ task.spawn(function()
                         TweenValue:Destroy()
                     end
 
+                    -- Exakt auf Zielposition setzen
                     car:PivotTo(CFrame.new(destination))
                     driveSeat.AssemblyLinearVelocity = Vector3.zero
                     driveSeat.AssemblyAngularVelocity = Vector3.zero
@@ -822,81 +848,12 @@ task.spawn(function()
                     car:SetAttribute("ParkingBrake", true)
                     car:SetAttribute("Locked", true)
                 end
+                -- ============================================================
 
                 local TeleportService = game:GetService("TeleportService")
                 local Players = game:GetService("Players")
                 local HttpService = game:GetService("HttpService")
                 local player = Players.LocalPlayer
-
-                -- ============================================================
-                -- HILFSFUNKTIONEN FÜR WANTED TIMER & STATUS
-                -- ============================================================
-                local function getWantedLevel()
-                    local success, result = pcall(function()
-                        for _, desc in ipairs(game:GetService("ReplicatedStorage"):WaitForChild("Code"):GetDescendants()) do
-                            if desc:IsA("ModuleScript") and desc.Name == "producer" then
-                                local mod = require(desc)
-                                if mod and mod.wantedData then
-                                    local state = mod.wantedData:getState()
-                                    if state and state.data then
-                                        return state.data.wantedLevel or 0
-                                    end
-                                end
-                            end
-                        end
-                    end)
-                    if success and result then return result end
-                    return 0
-                end
-
-                local function handleWantedAndHop()
-                    local wantedLevel = getWantedLevel()
-                    if wantedLevel > 0 then
-                        notify("Flux AutoRob", "Keine Raubüberfälle offen. Warte auf Wanted-Timer...")
-                        print("[Flux AutoRob] Gesucht (Level " .. tostring(wantedLevel) .. "). Warte auf Ablauf...")
-                        while getWantedLevel() > 0 do
-                            task.wait(1)
-                        end
-                        notify("Flux AutoRob", "Wanted-Timer abgelaufen! ServerHop startet...")
-                    else
-                        notify("Flux AutoRob", "Nichts offen. Sofortiger ServerHop...")
-                    end
-                    performServerHop()
-                end
-
-                local function checkIfAnythingToRob()
-                    if autorobBankClubToggle then
-                        local musikPart = workspace.Robberies["Club Robbery"].Club.Door.Accessory.Black
-                        local bankLight = game.Workspace.Robberies.BankRobbery.LightGreen.Light
-                        local bankLight2 = game.Workspace.Robberies.BankRobbery.LightRed.Light
-                        local JewelerPart = workspace.Robberies["Jeweler Safe Robbery"].Jeweler.Door.Accessory.Black
-                        
-                        if musikPart.Rotation == Vector3.new(180, 0, 180) or 
-                           (bankLight2.Enabled == false and bankLight.Enabled == true) or 
-                           JewelerPart.Rotation == Vector3.new(0, -90, 0) then
-                            return true
-                        end
-                    end
-                    
-                    if autorobContainersToggle then
-                        local containerFolder = workspace.Robberies.ContainerRobberies
-                        local containers = {}
-                        for _, model in ipairs(containerFolder:GetChildren()) do
-                            if model.Name == "ContainerRobbery" then
-                                table.insert(containers, model)
-                            end
-                        end
-                        if #containers >= 2 then
-                            local con1Planks = containers[1]:FindFirstChild("WoodPlanks", true)
-                            local con2Planks = containers[2]:FindFirstChild("WoodPlanks", true)
-                            if (con1Planks and con1Planks.Transparency == 1) or (con2Planks and con2Planks.Transparency == 1) then
-                                return true
-                            end
-                        end
-                    end
-                    return false
-                end
-                -- ============================================================
 
                 local function MoveToDealer()
                     local player = game:GetService("Players").LocalPlayer
@@ -920,7 +877,7 @@ task.spawn(function()
                         })
                         tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
 						task.wait(1)
-                        handleWantedAndHop()
+                        performServerHop()
                         return
                     end
 
@@ -943,7 +900,7 @@ task.spawn(function()
                         })
                         tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
 						task.wait(1)
-                        handleWantedAndHop()
+                        performServerHop()
                         return
                     end
 
@@ -980,26 +937,25 @@ task.spawn(function()
                     local bankPart = Workspace.Robberies.BankRobbery.VaultDoor["Meshes/Tresor_Plane (2)"]
                     local bankLight = game.Workspace.Robberies.BankRobbery.LightGreen.Light
                     local bankLight2 = game.Workspace.Robberies.BankRobbery.LightRed.Light
+                            if autoSellToggle == true then
+                                ensurePlayerInVehicle()
+                                MoveToDealer()
+                                task.wait(0.5)
 
-                    if autoSellToggle == true then
-                        ensurePlayerInVehicle()
-                        MoveToDealer()
-                        task.wait(0.5)
+                                args = {
+                                    [1] = "Gold",
+                                    [2] = "Dealer"
+                                }
+                                sellRemoteEvent:FireServer(unpack(args))
+                                sellRemoteEvent:FireServer(unpack(args))
+                                sellRemoteEvent:FireServer(unpack(args))
 
-                        args = {
-                            [1] = "Gold",
-                            [2] = "Dealer"
-                        }
-                        sellRemoteEvent:FireServer(unpack(args))
-                        sellRemoteEvent:FireServer(unpack(args))
-                        sellRemoteEvent:FireServer(unpack(args))
+                                tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
 
-                        tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
-                        ensurePlayerInVehicle()
-                        tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
-					    ensurePlayerInVehicle()
-                        tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
-                    end
+                            ensurePlayerInVehicle()
+                            tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
+					ensurePlayerInVehicle()
+                    tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
                     
                     if musikPart.Rotation == Vector3.new(180, 0, 180) then
                         clickAtCoordinates(0.5, 0.9)
@@ -1045,11 +1001,20 @@ task.spawn(function()
                         task.wait(1.8)
                         plrTween(musikStand)
 
-                        local safeFolder = workspace.Robberies["Club Robbery"].Club
+                        safeFolder = workspace.Robberies["Club Robbery"].Club
                         interactWithVisibleMeshParts(safeFolder:FindFirstChild("Items"))
                         interactWithVisibleMeshParts(safeFolder:FindFirstChild("Money"))
                         task.wait(0.5)
 
+                        ensurePlayerInVehicle()
+                        tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
+
+                    else
+                        game.StarterGui:SetCore("SendNotification", {
+                            Title = "Safe is not open",
+                            Text = "Going to Bank",
+                        })
+                    end
                         ensurePlayerInVehicle()
                         tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
                     else
@@ -1057,7 +1022,7 @@ task.spawn(function()
                             Title = "Safe is not open",
                             Text = "Going to Bank",
                         })
-                    end
+                end
 
                     if bankLight2.Enabled == false and bankLight.Enabled == true then
                         clickAtCoordinates(0.5, 0.9)
@@ -1106,7 +1071,7 @@ task.spawn(function()
                         EquipRemoteEvent:FireServer(unpack(args))
                         task.wait(.5)
                         
-                        local tool = plr.Character:FindFirstChild("Bomb")
+                        tool = plr.Character:FindFirstChild("Bomb")
                         if tool then
                             SpawnBomb()
                         else
@@ -1117,7 +1082,7 @@ task.spawn(function()
                         fireBombRemoteEvent:FireServer()
                         plrTween(Vector3.new(-1246.291015625, 7.749999046325684, 3120.8505859375))
                         task.wait(2.5)
-                        local safeFolder = Workspace.Robberies.BankRobbery
+                        safeFolder = Workspace.Robberies.BankRobbery
                         plrTween(Vector3.new(-1249.6793212890625, 7.7235636711120605, 3121.9423828125))
                         task.wait(6)
                         plrTween(Vector3.new(-1231.2696533203125, 7.7235002517700195, 3123.935546875))
@@ -1128,6 +1093,7 @@ task.spawn(function()
                         task.wait(6)
                         ensurePlayerInVehicle()
                         tweenTo(Vector3.new(-1143.7784423828125, 5.724719047546387, 3457.9404296875))
+
                     else
                         game.StarterGui:SetCore("SendNotification", {
                             Title = "Bank is not open",
@@ -1185,7 +1151,7 @@ task.spawn(function()
                         task.wait(1.8)
                         plrTween(JewelerStand)
 
-                        local safeFolder = workspace.Robberies["Jeweler Safe Robbery"].Jeweler
+                        safeFolder = workspace.Robberies["Jeweler Safe Robbery"].Jeweler
                         interactWithVisibleMeshParts(safeFolder:FindFirstChild("Items"))
                         interactWithVisibleMeshParts(safeFolder:FindFirstChild("Money"))
                         task.wait(0.5)
@@ -1193,13 +1159,25 @@ task.spawn(function()
                         ensurePlayerInVehicle()
                         tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
 						task.wait(1)
+                        performServerHop()
                     else
                         game.StarterGui:SetCore("SendNotification", {
                             Title = "Jeweler Safe is not open",
-                            Text = "Finished checking locations.",
+                            Text = "Going to Server Hop",
                         })
                         tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
 						task.wait(1)
+                        performServerHop()
+                    end
+                end
+
+                while task.wait() do
+                    if (autorobBankClubToggle or autorobContainersToggle) then
+                        task.spawn(startAutoCollect)
+                    end
+                    
+                    if autorobBankClubToggle == true then
+                        robBankAndClub()
                     end
                 end
 
@@ -1222,12 +1200,12 @@ task.spawn(function()
 
                     containers = getContainerRobberies(containerFolder) 
 
-                    local container1 = containers[1]
-                    local container2 = containers[2]
-                    local con1Planks = container1:FindFirstChild("WoodPlanks", true)
-                    local con2Planks = container2:FindFirstChild("WoodPlanks", true)
+                    container1 = containers[1]
+                    container2 = containers[2]
+                    con1Planks = container1:FindFirstChild("WoodPlanks", true)
+                    con2Planks = container2:FindFirstChild("WoodPlanks", true)
                                 
-                    local function isPoliceNearby()
+                    function isPoliceNearby()
                         local policeTeam = game:GetService("Teams"):FindFirstChild("Police")
                         for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
                             if plr.Team == policeTeam and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
@@ -1264,7 +1242,7 @@ task.spawn(function()
                         EquipRemoteEvent:FireServer(unpack(args))
                         task.wait(0.5)
                         
-                        local tool = plr.Character:FindFirstChild("Bomb")
+                        tool = plr.Character:FindFirstChild("Bomb")
                         if tool then
                             SpawnBomb()
                         else
@@ -1318,7 +1296,7 @@ task.spawn(function()
                         EquipRemoteEvent:FireServer(unpack(args))
                         task.wait(0.5)
                         
-                        local tool = plr.Character:FindFirstChild("Bomb")
+                        tool = plr.Character:FindFirstChild("Bomb")
                         if tool then
                             SpawnBomb()
                         else
@@ -1341,36 +1319,26 @@ task.spawn(function()
                         task.wait(0.5)
                         ensurePlayerInVehicle()
                         tweenTo(Vector3.new(1656.3526611328125, -25.936052322387695, 2821.137451171875))
+                        performServerHop()
                     else
                         game.StarterGui:SetCore("SendNotification", {
                             Title = "Container2 not open",
-                            Text = "Finished container check.",
+                            Text = "Hopping Server :^)",
                         })
                     end
 
                     ensurePlayerInVehicle()
                     tweenTo(Vector3.new(1656.3526611328125, -25.936052322387695, 2821.137451171875))
+                    performServerHop()
                 end
 
-                -- ============================================================
-                -- NEUER HAUPT-EXECUTION LOOP
-                -- ============================================================
-                while task.wait(1) do
-                    if (autorobBankClubToggle or autorobContainersToggle) then
-                        task.spawn(startAutoCollect)
-                        
-                        if autorobBankClubToggle == true then
-                            robBankAndClub()
-                        end
-                        
-                        if autorobContainersToggle == true then
-                            robContainers()
-                        end
-                        
-                        -- Wenn nichts mehr offen ist: Wanted abwarten, dann ServerHop
-                        if not checkIfAnythingToRob() then
-                            handleWantedAndHop()
-                        end
+                while task.wait() do
+                    if autorobBankClubToggle == true then
+                        robBankAndClub()
+                    end
+                    
+                    if autorobContainersToggle == true then
+                        robContainers()
                     end
                 end
 
