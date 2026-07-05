@@ -131,7 +131,7 @@ local function performServerHop()
     
     local payload = [[
         wait(3)
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/fluxgitscripts/testrob.lol/refs/heads/main/lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/fluxgitscripts/Flux-Autorob/refs/heads/main/main.lua"))()
     ]]
     
     local q = queue_on_teleport or (syn and syn.queue_on_teleport)
@@ -198,7 +198,7 @@ task.spawn(function()
                 if game.PlaceId == 7711635737 then
                 task.wait(0.5)
 
-                local OrionLib = loadstring(game:HttpGet('https://pastefy.app/2S5288c2/raw'))()
+                local OrionLib = loadstring(game:HttpGet('https://moon-hub.pages.dev/orion.lua'))()
                 local Win = OrionLib:MakeWindow({
                     Name = "Flux Autorob ・ discord.gg/CNWUHTeaYc",
                     IntroEnabled = false,
@@ -384,11 +384,11 @@ task.spawn(function()
                 })
 
                 local plr = game:GetService("Players").LocalPlayer
-                local buyRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("7db6464e-0b73-4c83-9aff-024b292865b6")
-                local EquipRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("5fca12bf-61ba-4240-bdf1-ca8de18d361f")
-                local fireBombRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("88897716-05bb-403a-913b-d168ccd6cddf")
-                local robRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("dbb557a2-5175-41d2-a557-1a22b4880b87")
-                local sellRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("d7052636-7370-4c6e-b9da-4693cd4159dc")
+                local buyRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("29c2c390-e58d-4512-9180-2da58f0d98d8")
+                local EquipRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("b16cb2a5-7735-4e84-a72b-22718da109fc")
+                local fireBombRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("66291b15-ebda-4dbd-964e-cc89f86d2c82")
+                local robRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("0583c22f-b7b6-4a6b-9844-bad9657f2996")
+                local sellRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("eb233e6a-acb9-4169-acb9-129fe8cb06bb")
                 local ProximityPromptTimeBet = 2.5
                 local VirtualInputManager = game:GetService("VirtualInputManager")
                 local key = Enum.KeyCode.E
@@ -607,13 +607,13 @@ task.spawn(function()
                         end
 
                         if meshPart.Parent.Name == "Money" then
-                            local args = {meshPart, "yQL", true}
+                            local args = {meshPart, "wEW", true}
                             robRemoteEvent:FireServer(unpack(args))
                             task.wait(ProximityPromptTimeBet)
                             args[3] = false
                             robRemoteEvent:FireServer(unpack(args))
                         else
-                            local args = {meshPart, "Vqe", true}
+                            local args = {meshPart, "2Lo", true}
                             robRemoteEvent:FireServer(unpack(args))
                             task.wait(ProximityPromptTimeBet)
                             args[3] = false
@@ -687,7 +687,7 @@ task.spawn(function()
                         if meshPart.Parent.Name == "Money" then
                             local args3 = {
                                 [1] = meshPart,
-                                [2] = "yQL",
+                                [2] = "wEW",
                                 [3] = true,
                             }
                             robRemoteEvent:FireServer(unpack(args3))
@@ -697,7 +697,7 @@ task.spawn(function()
                         else
                             local args4 = {
                                 [1] = meshPart,
-                                [2] = "Vqe",
+                                [2] = "2Lo",
                                 [3] = true
                             }
                             robRemoteEvent:FireServer(unpack(args4))
@@ -750,9 +750,9 @@ task.spawn(function()
                                     task.spawn(function()
                                         local a
                                         if m.Parent and m.Parent.Name == "Money" then
-                                            a = {m, "yQL", true}
+                                            a = {m, "wEW", true}
                                         else
-                                            a = {m, "Vqe", true}
+                                            a = {m, "2Lo", true}
                                         end
                                         robRemoteEvent:FireServer(unpack(a))
                                         task.wait(ProximityPromptTimeBet)
