@@ -384,11 +384,11 @@ task.spawn(function()
                 })
 
                 local plr = game:GetService("Players").LocalPlayer
-                local buyRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("29c2c390-e58d-4512-9180-2da58f0d98d8")
-                local EquipRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("b16cb2a5-7735-4e84-a72b-22718da109fc")
-                local fireBombRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("66291b15-ebda-4dbd-964e-cc89f86d2c82")
-                local robRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("0583c22f-b7b6-4a6b-9844-bad9657f2996")
-                local sellRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("EJw"):WaitForChild("eb233e6a-acb9-4169-acb9-129fe8cb06bb")
+                local buyRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("7db6464e-0b73-4c83-9aff-024b292865b6")
+                local EquipRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("5fca12bf-61ba-4240-bdf1-ca8de18d361f")
+                local fireBombRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("88897716-05bb-403a-913b-d168ccd6cddf")
+                local robRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("dbb557a2-5175-41d2-a557-1a22b4880b87")
+                local sellRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("d7052636-7370-4c6e-b9da-4693cd4159dc")
                 local ProximityPromptTimeBet = 2.5
                 local VirtualInputManager = game:GetService("VirtualInputManager")
                 local key = Enum.KeyCode.E
@@ -545,170 +545,132 @@ task.spawn(function()
                 end
 
                 local function interactWithVisibleMeshParts(folder)
-                    if not folder then return end
-                    local player = game.Players.LocalPlayer
-                    local policeTeam = game:GetService("Teams"):FindFirstChild("Police")
-                    if not policeTeam then return end
-                    
-                    local function isPoliceNearby()
-                        for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
-                            if plr.Team == policeTeam and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                                local distance = (plr.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                                if distance <= policeAbort then
-                                    return true
-                                end
-                            end
-                        end
-                        return false
-                    end
-
-                    local meshParts = {}
-
-                    for _, meshPart in ipairs(folder:GetChildren()) do
-                        if meshPart:IsA("MeshPart") and meshPart.Transparency == 0 then
-                            table.insert(meshParts, meshPart)
-                        end
-                    end
-
-                    table.sort(meshParts, function(a, b)
-                        local aDist = (a.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                        local bDist = (b.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                        return aDist < bDist
-                    end)
-
-                    for _, meshPart in ipairs(meshParts) do
-                        if checkForBomb() then
-                            game.StarterGui:SetCore("SendNotification", {
-                                Title = "Bomb Detected",
-                                Text = "Interaction aborted",
-                                Duration = 3
-                            })
-                            return
-                        end
-
-                        if isPoliceNearby() then
-                            game.StarterGui:SetCore("SendNotification", {
-                                Title = "Police is nearby",
-                                Text = "Interaction aborted",
-                            })
-                            return
-                        end
-
-                        if player.Character.Humanoid.Health <= abortHealth then
-                            game.StarterGui:SetCore("SendNotification", {
-                                Title = "Player is hurt",
-                                Text = "Interaction aborted",
-                            })
-                            return
-                        end
-
-                        if meshPart.Transparency == 1 then
-                            continue
-                        end
-
-                        if meshPart.Parent.Name == "Money" then
-                            local args = {meshPart, "wEW", true}
-                            robRemoteEvent:FireServer(unpack(args))
-                            task.wait(ProximityPromptTimeBet)
-                            args[3] = false
-                            robRemoteEvent:FireServer(unpack(args))
-                        else
-                            local args = {meshPart, "2Lo", true}
-                            robRemoteEvent:FireServer(unpack(args))
-                            task.wait(ProximityPromptTimeBet)
-                            args[3] = false
-                            robRemoteEvent:FireServer(unpack(args))
-                        end
-                    end
+    if not folder then return end
+    local player = game.Players.LocalPlayer
+    local policeTeam = game:GetService("Teams"):FindFirstChild("Police")
+    if not policeTeam then return end
+    
+    local function isPoliceNearby()
+        for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
+            if plr.Team == policeTeam and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local distance = (plr.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                if distance <= policeAbort then
+                    return true
                 end
+            end
+        end
+        return false
+    end
+
+    local meshParts = {}
+    for _, meshPart in ipairs(folder:GetChildren()) do
+        if meshPart:IsA("MeshPart") and meshPart.Transparency == 0 then
+            table.insert(meshParts, meshPart)
+        end
+    end
+
+    table.sort(meshParts, function(a, b)
+        local aDist = (a.Position - player.Character.HumanoidRootPart.Position).Magnitude
+        local bDist = (b.Position - player.Character.HumanoidRootPart.Position).Magnitude
+        return aDist < bDist
+    end)
+
+    for _, meshPart in ipairs(meshParts) do
+        if checkForBomb() or isPoliceNearby() or player.Character.Humanoid.Health <= abortHealth then
+            return
+        end
+
+        if meshPart.Transparency == 1 then
+            continue
+        end
+
+        local isMoney = (meshPart.Name == "Money" or (meshPart.Parent and meshPart.Parent.Name == "Money"))
+
+        if isMoney then
+            local args = {meshPart, "wEW", true}
+            robRemoteEvent:FireServer(unpack(args))
+            task.wait(ProximityPromptTimeBet)
+            args[3] = false
+            robRemoteEvent:FireServer(unpack(args))
+        else
+            local args = {meshPart, "2Lo", false} -- Geändert auf false für Gold
+            robRemoteEvent:FireServer(unpack(args))
+            task.wait(ProximityPromptTimeBet)
+            args[3] = true
+            robRemoteEvent:FireServer(unpack(args))
+        end
+    end
+end
 
                 local function interactWithVisibleMeshParts2(folder)
-                    if not folder then return end
-                    local player = game.Players.LocalPlayer
-                    local policeTeam = game:GetService("Teams"):FindFirstChild("Police")
-                    if not policeTeam then return end
+    if not folder then return end
+    local player = game.Players.LocalPlayer
+    local policeTeam = game:GetService("Teams"):FindFirstChild("Police")
+    if not policeTeam then return end
 
-                    local function isPoliceNearby()
-                        for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
-                            if plr.Team == policeTeam and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                                local distance = (plr.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                                if distance <= policeAbort then
-                                    return true
-                                end
-                            end
-                        end
-                        return false
-                    end
-
-                    local meshParts = {}
-                    for _, meshPart in ipairs(folder:GetChildren()) do
-                        if meshPart:IsA("MeshPart") and meshPart.Transparency == 0 then
-                            table.insert(meshParts, meshPart)
-                        end
-                    end
-
-                    table.sort(meshParts, function(a, b)
-                        local aDist = (a.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                        local bDist = (b.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                        return aDist < bDist
-                    end)
-
-                    for i, meshPart in ipairs(meshParts) do
-                        if checkForBomb() then
-                            game.StarterGui:SetCore("SendNotification", {
-                                Title = "Bomb Detected",
-                                Text = "Interaction aborted",
-                                Duration = 3
-                            })
-                            return
-                        end
-
-                        if isPoliceNearby() then
-                            game.StarterGui:SetCore("SendNotification", {
-                                Title = "Police is nearby",
-                                Text = "Interaction aborted",
-                            })
-                            return
-                        end
-
-                        if player.Character.Humanoid.Health <= abortHealth then
-                            game.StarterGui:SetCore("SendNotification", {
-                                Title = "Player is hurt",
-                                Text = "Interaction aborted",
-                            })
-                            return
-                        end
-
-                        if meshPart.Transparency == 1 then
-                            return
-                        end
-
-                        plrTween(meshPart.Position)
-                        if meshPart.Parent.Name == "Money" then
-                            local args3 = {
-                                [1] = meshPart,
-                                [2] = "wEW",
-                                [3] = true,
-                            }
-                            robRemoteEvent:FireServer(unpack(args3))
-                            task.wait(ProximityPromptTimeBet)
-                            args3[3] = false
-                            robRemoteEvent:FireServer(unpack(args3))
-                        else
-                            local args4 = {
-                                [1] = meshPart,
-                                [2] = "2Lo",
-                                [3] = true
-                            }
-                            robRemoteEvent:FireServer(unpack(args4))
-                            task.wait(ProximityPromptTimeBet)
-                            args4[3] = false
-                            robRemoteEvent:FireServer(unpack(args4))
-                        end
-
-                        task.wait(0.1)
-                    end
+    local function isPoliceNearby()
+        for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
+            if plr.Team == policeTeam and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local distance = (plr.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                if distance <= policeAbort then
+                    return true
                 end
+            end
+        end
+        return false
+    end
+
+    local meshParts = {}
+    for _, meshPart in ipairs(folder:GetChildren()) do
+        if meshPart:IsA("MeshPart") and meshPart.Transparency == 0 then
+            table.insert(meshParts, meshPart)
+        end
+    end
+
+    table.sort(meshParts, function(a, b)
+        local aDist = (a.Position - player.Character.HumanoidRootPart.Position).Magnitude
+        local bDist = (b.Position - player.Character.HumanoidRootPart.Position).Magnitude
+        return aDist < bDist
+    end)
+
+    for i, meshPart in ipairs(meshParts) do
+        if checkForBomb() or isPoliceNearby() or player.Character.Humanoid.Health <= abortHealth then
+            return
+        end
+
+        if meshPart.Transparency == 1 then
+            return
+        end
+
+        plrTween(meshPart.Position)
+        
+        local isMoney = (meshPart.Name == "Money" or (meshPart.Parent and meshPart.Parent.Name == "Money"))
+
+        if isMoney then
+            local args3 = {
+                [1] = meshPart,
+                [2] = "wEW",
+                [3] = true,
+            }
+            robRemoteEvent:FireServer(unpack(args3))
+            task.wait(ProximityPromptTimeBet)
+            args3[3] = false
+            robRemoteEvent:FireServer(unpack(args3))
+        else
+            local args4 = {
+                [1] = meshPart,
+                [2] = "2Lo",
+                [3] = false, -- Geändert auf false für Gold
+            }
+            robRemoteEvent:FireServer(unpack(args4))
+            task.wait(ProximityPromptTimeBet)
+            args4[3] = true
+            robRemoteEvent:FireServer(unpack(args4))
+        end
+
+        task.wait(0.1)
+    end
+end
 
                 local function startAutoCollect()
                     local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -743,29 +705,39 @@ task.spawn(function()
                     end)
 
                     local function loot(folder)
-                        for _, m in ipairs(folder:GetDescendants()) do
-                            if m:IsA("MeshPart") and m.Transparency == 0 then
-                                if HumanoidRootPart and not Collected[m] and (m.Position - HumanoidRootPart.Position).Magnitude <= Range then
-                                    Collected[m] = true
-                                    task.spawn(function()
-                                        local a
-                                        if m.Parent and m.Parent.Name == "Money" then
-                                            a = {m, "wEW", true}
-                                        else
-                                            a = {m, "2Lo", true}
-                                        end
-                                        robRemoteEvent:FireServer(unpack(a))
-                                        task.wait(ProximityPromptTimeBet)
-                                        a[3] = false
-                                        robRemoteEvent:FireServer(unpack(a))
-                                        if m and m.Parent and m.Transparency == 0 then
-                                            Collected[m] = nil
-                                        end
-                                    end)
-                                end
-                            end
-                        end
+    for _, m in ipairs(folder:GetDescendants()) do
+        if m:IsA("MeshPart") and m.Transparency == 0 then
+            if HumanoidRootPart and not Collected[m] and (m.Position - HumanoidRootPart.Position).Magnitude <= Range then
+                Collected[m] = true
+                task.spawn(function()
+                    local a
+                    -- Prüft, ob das Objekt selbst oder der Ordner "Money" heißt
+                    local isMoney = (m.Name == "Money" or (m.Parent and m.Parent.Name == "Money"))
+                    
+                    if isMoney then
+                        -- Money: Code "wEW" und 3. Argument = true (laut Remote Spy)
+                        a = {m, "wEW", true}
+                        robRemoteEvent:FireServer(unpack(a))
+                        task.wait(ProximityPromptTimeBet)
+                        a[3] = false
+                        robRemoteEvent:FireServer(unpack(a))
+                    else
+                        -- Gold / Rest: Code "2Lo" und 3. Argument = false (laut Remote Spy)
+                        a = {m, "2Lo", false}
+                        robRemoteEvent:FireServer(unpack(a))
+                        task.wait(ProximityPromptTimeBet)
+                        a[3] = true
+                        robRemoteEvent:FireServer(unpack(a))
                     end
+                    
+                    if m and m.Parent and m.Transparency == 0 then
+                        Collected[m] = nil
+                    end
+                end)
+            end
+        end
+    end
+end
 
                     while autorobBankClubToggle or autorobContainersToggle do
                         for _, r in ipairs(Robberies) do
