@@ -198,7 +198,7 @@ task.spawn(function()
                 if game.PlaceId == 7711635737 then
                 task.wait(0.5)
 
-                local OrionLib = loadstring(game:HttpGet('https://moon-hub.pages.dev/orion.lua'))()
+                local OrionLib = loadstring(game:HttpGet('https://pastefy.app/2S5288c2/raw'))()
                 local Win = OrionLib:MakeWindow({
                     Name = "Flux Autorob ・ discord.gg/CNWUHTeaYc",
                     IntroEnabled = false,
