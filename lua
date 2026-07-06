@@ -1,1324 +1,1458 @@
-local CHECK_INTERVAL = 3
+local function SetupAutoExecute()
+    local queueOnTeleport = (syn and syn.queue_on_teleport) or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
+    if queueOnTeleport then
+        queueOnTeleport([[
+            wait(2)
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/fluxgitscripts/testrob.lol/refs/heads/main/lua"))()
+        ]])
+    end
+end
+
+SetupAutoExecute()
+
+local OrionLib = loadstring(game:HttpGet("https://pastefy.app/2S5288c2/raw"))()
+
+local Window = OrionLib:MakeWindow({
+    Name         = "Night | discord.gg/DjvzXcqd5m ",
+    SaveConfig   = false,
+    IntroEnabled = false,
+    ConfigFolder = "NightSystemCfgR",
+    Icon         = "rbxassetid://140458594132153",
+})
+
 local Players = game:GetService("Players")
-local StarterGui = game:GetService("StarterGui")
-local player = Players.LocalPlayer
-local PlaceId = game.PlaceId
-
-local request = syn and syn.request or http and http.request or http_request or fluxus and fluxus.request or request
-local queue_on_teleport = syn and syn.queue_on_teleport or queue_on_teleport or fluxus and fluxus.queue_on_teleport
-
-
-
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 local TeleportService = game:GetService("TeleportService")
-local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local HttpService = game:GetService("HttpService")
-local player = Players.LocalPlayer
+local VirtualUser = game:GetService("VirtualUser")
 
+if not game:IsLoaded() then game.Loaded:Wait() end
+local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
-local SERVER_HISTORY_FILE = "Flux_ServerHistory.json"
-local MAX_HISTORY_SIZE = 20
+local RemoteFolder = ReplicatedStorage:WaitForChild("GpP")
 
+local RemoteEvents = {
+    rob = RemoteFolder:WaitForChild("0583c22f-b7b6-4a6b-9844-bad9657f2996"),
+    sell = RemoteFolder:WaitForChild("d7052636-7370-4c6e-b9da-4693cd4159dc"),
+    equip = RemoteFolder:WaitForChild("5fca12bf-61ba-4240-bdf1-ca8de18d361f"),
+    buy = RemoteFolder:WaitForChild("7db6464e-0b73-4c83-9aff-024b292865b6"),
+    bomb = RemoteFolder:WaitForChild("dbb557a2-5175-41d2-a557-1a22b4880b87"),
+    OpenPhone = RemoteFolder:WaitForChild("5fca12bf-61ba-4240-bdf1-ca8de18d361f"),
+    ClosePhone = RemoteFolder:WaitForChild("1a193de1-a4cc-49ec-8ea8-3c707c07b92d"),
+    hand = RemoteFolder:WaitForChild("1a193de1-a4cc-49ec-8ea8-3c707c07b92d"),
+}
 
-local function loadServerHistory()
-    if isfile and isfile(SERVER_HISTORY_FILE) then
+local Locations = {
+    start   = Vector3.new(-1248.078369140625, 5.846349239349365, 3339.4716796875),
+    club = {
+        position = Vector3.new(-1739.5330810546875, 11, 3052.31103515625),
+        stand    = Vector3.new(-1740.8582763671875, 11.09850025177002, 3019.416015625),
+        tresor   = Vector3.new(-1744, 11, 3012),
+        safe     = Vector3.new(-1743.4300537109375, 11.124999046325684, 3049.96630859375),
+    },
+    bank    = Vector3.new(-1280.954833984375, 5.372693061828613, 3166.63720703125),
+    jeweler = Vector3.new(-1248.078369140625, 5.846349239349365, 3339.4716796875),
+}
+
+local Codes = {
+    money = "wEW",
+    items = "2Lo",
+}
+
+local REJOIN_POSITION = Vector3.new(-1338.36, -23.71, 3778.24)
+
+local Config = {
+    range                = 200,
+    proximityPromptTime  = 2.5,
+    vehicleSpeed         = 170,
+    playerSpeed          = 28,
+    policeCheckRange     = 30,
+    lowHealthThreshold   = 35,
+    fastTeleportDistance = 100,
+    selectedRadarPosition = "position1",
+}
+
+local RobberySelections = {
+    mainRobbery = true,
+    jewelerEnabled = true,
+}
+
+local State = {
+    autorobToggle         = true,
+    autoSellToggle        = true,
+    fastTeleportToggle    = false,
+    adminDetectionToggle  = true,
+    autoVehicleTPToggle   = false,
+    isRobbing             = false,
+    collected             = {},
+}
+
+local BombDetectionEnabled   = true
+local VehicleSpeedMultiplier = 125
+local WebhookUrl             = ""
+local DetonationItem         = "Bomb"
+
+local RobberyStats = {
+    sessionStartTime     = 0,
+    bombsPurchased       = 0,
+    safesRobbed          = 0,
+    alreadyRobbedIgnored = 0,
+    clubRobbed           = false,
+    bankRobbed           = false,
+    jewelerRobbed        = false,
+}
+
+local Stats = {
+    currentBalance = "N/A",
+    crimemoney     = "N/A",
+}
+
+cloneref = (type(cloneref) == "function") and cloneref or function(...) return ... end
+
+local InvServices = setmetatable({}, {
+    __index = function(_, n)
+        return cloneref(game:GetService(n))
+    end
+})
+
+local InvRunService = InvServices.RunService
+
+local InvCharacter = Player.Character or Player.CharacterAdded:Wait()
+local InvHumanoid  = InvCharacter:WaitForChild("Humanoid")
+
+local InvisibleEnabled       = false
+local InvisibleToggleEnabled = true
+local CurrentTrack
+local LastPosition       = InvCharacter.PrimaryPart and InvCharacter.PrimaryPart.Position or Vector3.new()
+local OriginalCollisions = {}
+
+local InvRenderConnection
+local InvSteppedConnection
+local InputBlockConnection
+
+Player.CharacterAdded:Connect(function(c)
+    InvCharacter = c
+    InvHumanoid  = c:WaitForChild("Humanoid")
+    LastPosition = InvCharacter.PrimaryPart and InvCharacter.PrimaryPart.Position or Vector3.new()
+end)
+
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/NightSyste/NightUI/refs/heads/main/Night.lua"))()
+
+local Window = OrionLib:MakeWindow({
+    Name         = "Night | .gg/DjvzXcqd5m ",
+    SaveConfig   = false,
+    IntroEnabled = false,
+    ConfigFolder = "NightSystemCfgR",
+    Icon         = "rbxassetid://140458594132153",
+})
+
+local InfoGroup = Window:MakeTabGroup({ Name = "Script" })
+local AutorobGroup = Window:MakeTabGroup({ Name = "Autorob" })
+
+local tabs = {
+    Info  = InfoGroup:MakeTab({ Name = "Information",  Icon = "rbxassetid://92667392992793" }),
+    AutoRob  = AutorobGroup:MakeTab({ Name = "AutoRob",  Icon = "rbxassetid://4814047006" }),
+}
+
+local function saveConfig()
+    local config = {
+        autorobToggle          = State.autorobToggle,
+        autoSellToggle         = State.autoSellToggle,
+        fastTeleportToggle     = State.fastTeleportToggle,
+        adminDetectionToggle   = State.adminDetectionToggle,
+        autoVehicleTPToggle    = State.autoVehicleTPToggle,
+        mainRobbery            = RobberySelections.mainRobbery,
+        jewelerEnabled         = RobberySelections.jewelerEnabled,
+        VehicleSpeedMultiplier = VehicleSpeedMultiplier,
+        playerSpeed            = Config.playerSpeed,
+        lowHealthThreshold     = Config.lowHealthThreshold,
+        policeCheckRange       = Config.policeCheckRange,
+        WebhookUrl             = WebhookUrl,
+        InvisibleToggleEnabled = InvisibleToggleEnabled,
+        DetonationItem         = DetonationItem,
+        fastTeleportDistance   = Config.fastTeleportDistance,
+    }
+    local configFileName = "NightSystemCfgR.json"
+    if isfile then
+        if isfile(configFileName) then delfile(configFileName) end
+        writefile(configFileName, HttpService:JSONEncode(config))
+    end
+end
+
+local function loadConfig()
+    local configFileName = "NightSystemCfgR.json"
+    if isfile and isfile(configFileName) then
         local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile(SERVER_HISTORY_FILE))
+            return HttpService:JSONDecode(readfile(configFileName))
         end)
-        if success and type(data) == "table" then
-            return data
+        if success and data then
+            if data.autorobToggle ~= nil then State.autorobToggle = data.autorobToggle end
+            if data.autoSellToggle ~= nil then State.autoSellToggle = data.autoSellToggle end
+            if data.fastTeleportToggle ~= nil then State.fastTeleportToggle = data.fastTeleportToggle end
+            if data.adminDetectionToggle ~= nil then State.adminDetectionToggle = data.adminDetectionToggle end
+            if data.autoVehicleTPToggle ~= nil then State.autoVehicleTPToggle = data.autoVehicleTPToggle end
+            if data.mainRobbery ~= nil then RobberySelections.mainRobbery = data.mainRobbery end
+            if data.jewelerEnabled ~= nil then RobberySelections.jewelerEnabled = data.jewelerEnabled end
+            if data.VehicleSpeedMultiplier ~= nil then VehicleSpeedMultiplier = data.VehicleSpeedMultiplier end
+            if data.playerSpeed ~= nil then Config.playerSpeed = data.playerSpeed end
+            if data.lowHealthThreshold ~= nil then Config.lowHealthThreshold = data.lowHealthThreshold end
+            if data.policeCheckRange ~= nil then Config.policeCheckRange = data.policeCheckRange end
+            if data.WebhookUrl ~= nil then WebhookUrl = data.WebhookUrl end
+            if data.InvisibleToggleEnabled ~= nil then InvisibleToggleEnabled = data.InvisibleToggleEnabled end
+            if data.DetonationItem ~= nil then DetonationItem = data.DetonationItem end
+            if data.fastTeleportDistance ~= nil then Config.fastTeleportDistance = data.fastTeleportDistance end
         end
     end
-    return {}
 end
 
-local function saveServerHistory(history)
-    if writefile then
-        pcall(function()
-            writefile(SERVER_HISTORY_FILE, HttpService:JSONEncode(history))
-        end)
-    end
-end
+loadConfig()
 
-
-local function addCurrentServerToHistory()
-    local currentJobId = game.JobId
-    if not currentJobId then return end
-    
-    local history = loadServerHistory()
-    
-
-    for _, serverId in ipairs(history) do
-        if serverId == currentJobId then
-            return
-        end
-    end
-    
-
-    table.insert(history, 1, currentJobId)
-    
-
-    if #history > MAX_HISTORY_SIZE then
-        table.remove(history)
-    end
-    
-    saveServerHistory(history)
-end
-
-local function findNewServer()
-    local currentJobId = game.JobId
-    local history = loadServerHistory()
-    
-    local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100", game.PlaceId)
-    
-    local success, result = pcall(function()
-        local response = game:HttpGet(url)
-        return HttpService:JSONDecode(response)
-    end)
-    
-    if not success or not result or not result.data then
-        warn("[ServerHop] Error calling ServerList API")
-        return nil
-    end
-    
-    local goodServers = {}
-    local anyServers = {}    
-    
-    print(string.format("[ServerHop] Found Server: %d", #result.data))
-    
-    for _, server in ipairs(result.data) do
-        if server.id and server.playing and server.maxPlayers then
-            local serverId = tostring(server.id)
-            
-            local inHistory = false
-            for _, histId in ipairs(history) do
-                if histId == serverId then
-                    inHistory = true
-                    break
-                end
-            end
-            
-            if serverId ~= currentJobId and not inHistory then
-                if server.playing < server.maxPlayers and server.playing > 1 then
-                    table.insert(anyServers, server)
-                    if server.playing >= 15 then
-                        table.insert(goodServers, server)
-                    end
-                end
-            end
-        end
-    end
-    
-    print(string.format("[ServerHop] Available Server: %d (Good Servers: %d)", #anyServers, #goodServers))
-    
-    if #goodServers > 0 then
-        local selected = goodServers[math.random(1, #goodServers)]
-        print(string.format("[ServerHop] Good Server were choosen: %s (%d/%d Player)", selected.id, selected.playing, selected.maxPlayers))
-        return selected
-    elseif #anyServers > 0 then
-        local selected = anyServers[math.random(1, #anyServers)]
-        print(string.format("[ServerHop] Choosed Server: %s (%d/%d Player)", selected.id, selected.playing, selected.maxPlayers))
-        return selected
-    end
-    
-    return nil
-end
-
-
-local function performServerHop()
-    print("[ServerHop] Starting Serverhop...")
-    
-    addCurrentServerToHistory()
-    
-    local payload = [[
-        wait(3)
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/fluxgitscripts/testrob.lol/refs/heads/main/lua"))()
-    ]]
-    
-    local q = queue_on_teleport or (syn and syn.queue_on_teleport)
-    if q then
-        q(payload)
-        print("[ServerHop] Auto-Execution for next Server set up.")
-    end
-
-
-
-    player:Kick("Made by zzkxnsti Searching for new Server. ServerHop happens automatically...")                    
-	task.wait(1.5)  
-
-
-    local newServer = findNewServer()
-    
-    if newServer then
-        print(string.format("[ServerHop] Teleport tried to server %s", newServer.id))
-        
-        local success, err = pcall(function()
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, newServer.id, player)
-        end)
-        
-        if not success then
-            warn("[ServerHop] Direct Teleport countered an error: " .. err)
-            
-            task.wait(2)
-            
-            pcall(function()
-                TeleportService:Teleport(game.PlaceId, player)
-            end)
-        end
-    else
-        print("[ServerHop] No Server found → Normal Teleport")
-        task.wait(1)
-        
-        pcall(function()
-            TeleportService:Teleport(game.PlaceId, player)
-        end)
-    end
-end
-
-
-local function notify(title, text)
-    StarterGui:SetCore("SendNotification", {
-        Title = title,
-        Text = text,
-        Duration = 2 
+local function sendNotification(title, content)
+    OrionLib:MakeNotification({
+        Name    = title,
+        Content = content,
+        Image   = "rbxassetid://4483345998",
+        Time    = 2,
     })
 end
-local PrisonMessageSent = false
-task.spawn(function()
-    while true do
-        local team = player.Team
-        if team then
-            if team.Name == "Prisoner" then
-                if PrisonMessageSent == false then
-                    notify("Flux AutoRob", "You are in the Prison - Waiting for release.")
-                    PrisonMessageSent = true
+
+tabs.AutoRob:AddSection({ Name = "AutoRob Script" })
+tabs.AutoRob:AddToggle({
+    Name     = "Autorob",
+    Default  = State.autorobToggle,
+    Callback = function(v)
+        State.autorobToggle = v
+        saveConfig()
+    end,
+})
+tabs.AutoRob:AddDropdown({
+    Name    = "Select Robberies",
+    Default = RobberySelections.jewelerEnabled and "Bank & Club & Jeweler" or "Bank & Club",
+    Options = { "Bank & Club", "Bank & Club & Jeweler" },
+    Callback = function(v)
+        RobberySelections.mainRobbery = true
+        RobberySelections.jewelerEnabled = (v == "Bank & Club & Jeweler")
+        saveConfig()
+    end,
+})
+tabs.AutoRob:AddToggle({
+    Name     = "Autosell Items",
+    Default  = State.autoSellToggle,
+    Callback = function(v)
+        State.autoSellToggle = v
+        saveConfig()
+    end,
+})
+
+tabs.AutoRob:AddSection({ Name = "Toggle Settings" })
+tabs.AutoRob:AddToggle({
+    Name     = "Fast Player Teleport",
+    Default  = State.fastTeleportToggle,
+    Callback = function(v)
+        State.fastTeleportToggle = v
+        saveConfig()
+    end,
+})
+tabs.AutoRob:AddToggle({
+    Name     = "Fast Vehicle Teleport",
+    Default  = State.autoVehicleTPToggle,
+    Callback = function(v)
+        State.autoVehicleTPToggle = v
+        saveConfig()
+    end,
+})
+tabs.AutoRob:AddToggle({
+    Name     = "Mod Detection",
+    Default  = State.adminDetectionToggle,
+    Callback = function(v)
+        State.adminDetectionToggle = v
+        saveConfig()
+    end,
+})
+tabs.AutoRob:AddToggle({
+    Name     = "Invisibility",
+    Default  = InvisibleToggleEnabled,
+    Callback = function(v)
+        InvisibleToggleEnabled = v
+        saveConfig()
+    end,
+})
+
+tabs.AutoRob:AddSection({ Name = "Slider Settings" })
+tabs.AutoRob:AddSlider({
+    Name      = "Vehicle Speed",
+    Min       = 75,
+    Max       = 175,
+    Default   = VehicleSpeedMultiplier,
+    Color     = Color3.fromRGB(85, 170, 255),
+    Increment = 25,
+    ValueName = "speed",
+    Callback  = function(v)
+        VehicleSpeedMultiplier = v
+        saveConfig()
+    end,
+})
+tabs.AutoRob:AddSlider({
+    Name      = "Player Speed",
+    Min       = 20,
+    Max       = 75,
+    Default   = Config.playerSpeed,
+    Color     = Color3.fromRGB(85, 170, 255),
+    Increment = 5,
+    ValueName = "speed",
+    Callback  = function(v)
+        Config.playerSpeed = v
+        saveConfig()
+    end,
+})
+tabs.AutoRob:AddSlider({
+    Name      = "Low Health Threshold",
+    Min       = 10,
+    Max       = 100,
+    Default   = Config.lowHealthThreshold,
+    Color     = Color3.fromRGB(255, 85, 85),
+    Increment = 5,
+    ValueName = "health",
+    Callback  = function(v)
+        Config.lowHealthThreshold = v
+        saveConfig()
+    end,
+})
+tabs.AutoRob:AddSlider({
+    Name      = "Police Detection Range",
+    Min       = 10,
+    Max       = 100,
+    Default   = Config.policeCheckRange,
+    Color     = Color3.fromRGB(85, 170, 255),
+    Increment = 5,
+    ValueName = "studs",
+    Callback  = function(v)
+        Config.policeCheckRange = v
+        saveConfig()
+    end,
+})
+
+tabs.AutoRob:AddSection({ Name = "Dropdown Settings" })
+tabs.AutoRob:AddDropdown({
+    Name     = "Detonation Item",
+    Default  = DetonationItem,
+    Options  = { "Bomb", "Grenade" },
+    Callback = function(v)
+        DetonationItem = v
+        saveConfig()
+    end,
+})
+
+tabs.AutoRob:AddSection({ Name = "Other Settings" })
+tabs.AutoRob:AddTextbox({
+    Name          = "Webhook URL",
+    Default       = WebhookUrl,
+    TextDisappear = true,
+    Callback      = function(v)
+        WebhookUrl = v
+        saveConfig()
+    end,
+})
+tabs.AutoRob:AddButton({
+    Name = "Reset Config",
+    Callback = function()
+        local configFileName = "NightSystemCfgR.json"
+        if isfile and isfile(configFileName) then delfile(configFileName) end
+        State.autorobToggle = true
+        State.autoSellToggle = true
+        State.fastTeleportToggle = false
+        State.adminDetectionToggle = true
+        State.autoVehicleTPToggle = false
+        RobberySelections.mainRobbery = true
+        VehicleSpeedMultiplier = 125
+        Config.playerSpeed = 28
+        Config.lowHealthThreshold = 35
+        Config.policeCheckRange = 30
+        Config.fastTeleportDistance = 240
+        WebhookUrl = ""
+        InvisibleToggleEnabled = true
+        DetonationItem = "Bomb"
+        saveConfig()
+        sendNotification("Settings Reset", "All settings have been reset to default.")
+    end
+})
+
+tabs.Info:AddSection({ Name = "Information" })
+tabs.Info:AddParagraph("Warning", "Your device might not be powerful enough to handle this script smoothly. If you get ejected from your vehicle or kicked, lower your graphics settings before running again.")
+tabs.Info:AddParagraph("Important", "Always keep your vehicle speed set below the maximum speed your car is actually capable of reaching. Exceeding it may cause issues.")
+
+local function saveCollisions()
+    for _, p in ipairs(InvCharacter:GetDescendants()) do
+        if p:IsA("BasePart") then
+            OriginalCollisions[p] = p.CanCollide
+        end
+    end
+end
+
+local function disableCollisions()
+    for _, p in ipairs(InvCharacter:GetDescendants()) do
+        if p:IsA("BasePart") then
+            p.CanCollide = false
+        end
+    end
+end
+
+local function restoreCollisions()
+    for p, state in pairs(OriginalCollisions) do
+        if p and p.Parent then
+            p.CanCollide = state
+        end
+    end
+    OriginalCollisions = {}
+end
+
+local function startEmote()
+    if CurrentTrack then CurrentTrack:Stop(0) end
+    local animId = "rbxassetid://94292601332790"
+    pcall(function()
+        local objs = game:GetObjects(animId)
+        if objs and #objs > 0 and objs[1]:IsA("Animation") then
+            animId = objs[1].AnimationId
+        end
+    end)
+    local anim = Instance.new("Animation")
+    anim.AnimationId = animId
+    local track = InvHumanoid:LoadAnimation(anim)
+    track.Priority = Enum.AnimationPriority.Action4
+    track:Play(0.1, 1, 1)
+    CurrentTrack = track
+    if CurrentTrack.Length > 0 then CurrentTrack.TimePosition = 0 end
+    saveCollisions()
+    disableCollisions()
+end
+
+local function stopEmote()
+    if CurrentTrack then
+        CurrentTrack:Stop(0.1)
+        CurrentTrack = nil
+    end
+    restoreCollisions()
+end
+
+local function enableInvisible()
+    local invisibleEnabled = InvisibleToggleEnabled
+    if not invisibleEnabled then return end
+    if InvisibleEnabled then return end
+    InvisibleEnabled = true
+    startEmote()
+    InputBlockConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        local blocked = {
+            Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D,
+            Enum.KeyCode.Up, Enum.KeyCode.Down, Enum.KeyCode.Left, Enum.KeyCode.Right,
+            Enum.KeyCode.Space,
+        }
+        for _, key in ipairs(blocked) do
+            if input.KeyCode == key then return true end
+        end
+    end, true)
+    InvRenderConnection = InvRunService.RenderStepped:Connect(function()
+        if not InvisibleEnabled then return end
+        if CurrentTrack and CurrentTrack.IsPlaying and InvCharacter.PrimaryPart then
+            LastPosition = InvCharacter.PrimaryPart.Position
+        end
+    end)
+    InvSteppedConnection = InvRunService.Stepped:Connect(function()
+        if InvisibleEnabled and InvCharacter and InvCharacter.Parent then
+            disableCollisions()
+        end
+    end)
+end
+
+local function disableInvisible()
+    if not InvisibleEnabled then return end
+    InvisibleEnabled = false
+    stopEmote()
+    if InputBlockConnection then InputBlockConnection:Disconnect(); InputBlockConnection = nil end
+    if InvRenderConnection then InvRenderConnection:Disconnect(); InvRenderConnection = nil end
+    if InvSteppedConnection then InvSteppedConnection:Disconnect(); InvSteppedConnection = nil end
+end
+
+local function checkForBomb()
+    if not BombDetectionEnabled then return false end
+    if not Player.Character or not Player.Character:FindFirstChild("HumanoidRootPart") then return false end
+    local playerPos = Player.Character.HumanoidRootPart.Position
+    local foldersToCheck = {
+        workspace.Objects.Throwables.Bomb,
+        workspace.Objects.Throwables.Grenade,
+    }
+    for _, folder in ipairs(foldersToCheck) do
+        if folder then
+            for _, bombModel in ipairs(folder:GetChildren()) do
+                local shouldIgnore = false
+                local mainPart = bombModel:FindFirstChild("Main")
+                if mainPart and mainPart:IsA("BasePart") then
+                    local c = mainPart.Color
+                    if math.floor(c.R*255)==27 and math.floor(c.G*255)==42 and math.floor(c.B*255)==53 then
+                        shouldIgnore = true
+                    end
                 end
-                warn("[Prison Check] Team: Prisoner")
-            elseif team.Name == "Citizen" then
-                notify("Flux AutoRob", "Starting AutoRob...")  
-                if game.PlaceId == 7711635737 then
-                task.wait(0.5)
-
-                local OrionLib = loadstring(game:HttpGet('https://pastefy.app/2S5288c2/raw'))()
-                local Win = OrionLib:MakeWindow({
-                    Name = "Flux Autorob ・ discord.gg/CNWUHTeaYc",
-                    IntroEnabled = false,
-                })
-
-                local InfosTab = Win:MakeTab({
-                    Name = "Infos",
-                    Icon = "rbxassetid://110571167375107",
-                    PremiumOnly = false,
-                })
-
-                local AutoRobTab = Win:MakeTab({
-                    Name = "AutoRob",
-                    Icon = "rbxassetid://76479561414083",
-                    PremiumOnly = false,
-                })
-
-                local Section1 = AutoRobTab:AddSection({
-                    Name = "AutoRob",
-                })
-                local Section = InfosTab:AddSection({
-                    Name = 'General'
-                })
-
-                AutoRobTab:AddParagraph("Important", 'Please read "Infos" before starting AutoRob!')
-
-                InfosTab:AddParagraph("Bomb Issue", "If you got the problem that it buys much bombs, please dont\nopen a ticket. Im working on it!")
-
-                local Section = InfosTab:AddSection({
-                    Name = "Others"
-                })
-                InfosTab:AddParagraph("Other Problems", "If you got any other problems, please open a ticket in our\nDiscord Server")
-                InfosTab:AddParagraph("Important", 'This Autorob is in the Early Stage, so expect some bugs and issues. Please report them in our Discord Server!')
-                InfosTab:AddLabel("AutoRob V1.1")
-
-                local configFileName = "FluxAutoRob_config5.json"
-
-                local autorobBankClubToggle = false
-                local autorobContainersToggle = false
-                local autoSellToggle = false
-                local tweenSpeed = 175  
-                local abortHealth = 47  
-                local plrTweenSpeed = 50
-                local policeAbort = 25
-                local bombDetectionEnabled = true
-                local PlayerTeleportEnabled = true
-
-                local function loadConfig()
-                    if isfile(configFileName) then
-                        local data = readfile(configFileName)
-                        local success, config = pcall(function() return game:GetService("HttpService"):JSONDecode(data) end)
-                        if success and config then
-                            autorobBankClubToggle = config.autorobBankClubToggle or false
-                            autorobContainersToggle = config.autorobContainersToggle or false
-                            autoSellToggle = config.autoSellToggle or false
-                            tweenSpeed = tonumber(config.tweenSpeed) or tweenSpeed
-                            plrTweenSpeed = tonumber(config.plrTweenSpeed) or plrTweenSpeed
-                            abortHealth = tonumber(config.abortHealth) or abortHealth
-                            policeAbort = tonumber(config.policeAbort) or policeAbort
-                            if config.bombDetectionEnabled ~= nil then
-                                bombDetectionEnabled = config.bombDetectionEnabled
+                if not shouldIgnore then
+                    local bombPart = bombModel:FindFirstChild("Handle")
+                        or bombModel:FindFirstChild("MainPart")
+                        or bombModel:FindFirstChildWhichIsA("BasePart")
+                    if bombPart then
+                        if (bombPart.Position - playerPos).Magnitude <= 5 then return true end
+                    else
+                        for _, part in ipairs(bombModel:GetDescendants()) do
+                            if part:IsA("BasePart") and (part.Position - playerPos).Magnitude <= 5 then
+                                return true
                             end
                         end
                     end
                 end
+            end
+        end
+    end
+    return false
+end
 
-                local function saveConfig()
-                    local config = {
-                        autorobBankClubToggle = autorobBankClubToggle,
-                        autorobContainersToggle = autorobContainersToggle,
-                        autoSellToggle = autoSellToggle,
-                        plrTweenSpeed = plrTweenSpeed,
-                        tweenSpeed = tweenSpeed,
-                        abortHealth = abortHealth,
-                        policeAbort = policeAbort,
-                        bombDetectionEnabled = bombDetectionEnabled,
-                    }
-                    local json = game:GetService("HttpService"):JSONEncode(config)
-                    writefile(configFileName, json)
-                end
+local function isPlayerStaff(player)
+    if player.UserId == game.CreatorId then return true end
+    if game.CreatorType == Enum.CreatorType.Group then
+        local ok, rank = pcall(function() return player:GetRankInGroup(game.CreatorId) end)
+        if ok and rank >= 250 then return true end
+    end
+    return false
+end
 
-                loadConfig()
+local function checkForStaffPlayers()
+    local adminToggle = State.adminDetectionToggle
+    if not adminToggle then return end
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= Player then
+            local ok, isStaff = pcall(function() return isPlayerStaff(player) end)
+            if ok and isStaff then
+                sendNotification("Mod Detected", "Mod " .. player.Name .. " detected.")
+                Player:Kick("Night System|Mod detected")
+                return
+            end
+        end
+    end
+end
 
-                AutoRobTab:AddToggle({
-                    Name = "AutoRob",
-                    Default = autorobBankClubToggle,
-                    Callback = function(Value)
-                        autorobBankClubToggle = Value
-                        saveConfig()
-                    end    
-                })
+local function AdminDtc()
+    local function startDetection()
+        Players.PlayerAdded:Connect(function(player)
+            task.wait(2)
+            local adminToggle = State.adminDetectionToggle
+            if not adminToggle then return end
+            local ok, isStaff = pcall(function() return isPlayerStaff(player) end)
+            if ok and isStaff then
+                sendNotification("Mod Detected", "Mod " .. player.Name .. " joined.")
+                Player:Kick("Night System|Mod detected")
+            end
+        end)
+        checkForStaffPlayers()
+    end
+    task.spawn(startDetection)
+end
 
-                local Section = AutoRobTab:AddSection({
-                    Name = 'Options'
-                })
-                AutoRobTab:AddToggle({
-                    Name = "Auto Sell",
-                    Default = autoSellToggle,
-                    Callback = function(Value)
-                        autoSellToggle = Value
-                        saveConfig()
-                    end    
-                })
-
-                AutoRobTab:AddToggle({
-                    Name = "Bomb Nearby Check",
-                    Default = bombDetectionEnabled,
-                    Callback = function(Value)
-                        bombDetectionEnabled = Value
-                        saveConfig()
-                    end
-                })
-
-                AutoRobTab:AddToggle({
-                    Name = "Fast Player Teleports",
-                    Default = true,
-                    Callback = function(Value)
-                        PlayerTeleportEnabled = Value
-                    end
-                })
-
-                local Section = AutoRobTab:AddSection({
-                    Name = 'Settings'
-                })
-                AutoRobTab:AddSlider({
-                    Name = "Teleport Speed",
-                    Min = 50,
-                    Max = 185,
-                    Default = tweenSpeed,
-                    Increment = 5,
-                    ValueName = "Speed",
-                    Color = Color3.fromRGB(137, 207, 240),
-                    Callback = function(Value)
-                        tweenSpeed = Value
-                        saveConfig()
-                        print("Tween Speed set to: " .. Value)
-                    end    
-                })
-
-                AutoRobTab:AddSlider({
-                    Name = "Police Abort Distance",
-                    Min = 5,
-                    Max = 100,
-                    Default = policeAbort,
-                    Increment = 1,
-                    ValueName = "Studs",
-                    Color = Color3.fromRGB(137, 207, 240),
-                    Callback = function(Value)
-                        policeAbort = Value
-                        saveConfig()
-                        print("Police Abort Distance set to: " .. Value .. " Studs")
-                    end    
-                })
-
-                AutoRobTab:AddSlider({
-                    Name = "Player Movement Speed",
-                    Min = 10,
-                    Max = 50,
-                    Default = plrTweenSpeed,
-                    Increment = 1,
-                    ValueName = "Speed",
-                    Color = Color3.fromRGB(137, 207, 240),
-                    Callback = function(Value)
-                        plrTweenSpeed = Value
-                        saveConfig()
-                        print("Player Movement Speed set to: " .. Value)
-                    end    
-                })
-
-                AutoRobTab:AddSlider({
-                    Name = "Abort at Health",
-                    Min = 25,
-                    Max = 80,
-                    Default = abortHealth,
-                    Increment = 1,
-                    ValueName = "HP",
-                    Color = Color3.fromRGB(137, 207, 240),
-                    Callback = function(Value)
-                        abortHealth = Value
-                        saveConfig()
-                        print("Abort Health set to: " .. Value .. " HP")
-                    end    
-                })
-
-                local plr = game:GetService("Players").LocalPlayer
-                local buyRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("7db6464e-0b73-4c83-9aff-024b292865b6")
-                local EquipRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("5fca12bf-61ba-4240-bdf1-ca8de18d361f")
-                local fireBombRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("88897716-05bb-403a-913b-d168ccd6cddf")
-                local robRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("dbb557a2-5175-41d2-a557-1a22b4880b87")
-                local sellRemoteEvent = game:GetService("ReplicatedStorage"):WaitForChild("GpP"):WaitForChild("d7052636-7370-4c6e-b9da-4693cd4159dc")
-                local ProximityPromptTimeBet = 2.5
-                local VirtualInputManager = game:GetService("VirtualInputManager")
-                local key = Enum.KeyCode.E
-                local TweenService = game:GetService("TweenService")
-                local VirtualInputManager = game:GetService("VirtualInputManager")
-
-                local function checkForBomb()
-                    if not bombDetectionEnabled then return false end
-
-                    local player = game.Players.LocalPlayer
-                    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
-                        return false
-                    end
-
-                    local playerPos = player.Character.HumanoidRootPart.Position
-
-                    local foldersToCheck = {
-                        workspace.Objects and workspace.Objects.Throwables and workspace.Objects.Throwables:FindFirstChild("Bomb"),
-                        workspace.Objects and workspace.Objects.Throwables and workspace.Objects.Throwables:FindFirstChild("Grenade")
-                    }
-
-                    for _, folder in ipairs(foldersToCheck) do
-                        if folder then
-                            for _, bombModel in ipairs(folder:GetChildren()) do
-                                local shouldIgnore = false
-
-                                local mainPart = bombModel:FindFirstChild("Main")
-                                if mainPart and mainPart:IsA("BasePart") then
-                                    local color = mainPart.Color
-                                    if math.floor(color.R * 255) == 27 and
-                                       math.floor(color.G * 255) == 42 and
-                                       math.floor(color.B * 255) == 53 then
-                                        shouldIgnore = true
-                                    end
-                                end
-
-                                if not shouldIgnore then
-                                    local bombPart = bombModel:FindFirstChild("Handle") or
-                                        bombModel:FindFirstChild("MainPart") or
-                                        bombModel:FindFirstChildWhichIsA("BasePart")
-
-                                    if bombPart then
-                                        if (bombPart.Position - playerPos).Magnitude <= 5 then
-                                            return true
-                                        end
-                                    else
-                                        for _, part in ipairs(bombModel:GetDescendants()) do
-                                            if part:IsA("BasePart") then
-                                                if (part.Position - playerPos).Magnitude <= 5 then
-                                                    return true
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    return false
-                end
-
-                local function SpawnBomb()
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
-                    task.wait(0.1)
-                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
-                    task.wait(0.5)
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                    task.wait(0.1)
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-                end
-
-                local function JumpOut()
-                    local Players = game:GetService("Players")
-                    local LocalPlayer = Players.LocalPlayer    
-                    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-                    if character then
-                        local humanoid = character:FindFirstChild("Humanoid")
-                        if humanoid and humanoid.SeatPart then
-                            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                        end
-                    end
-                end
-
-                local function ensurePlayerInVehicle()
-                    local player = game:GetService("Players").LocalPlayer
-                    local vehicle = workspace:FindFirstChild("Vehicles") and workspace.Vehicles:FindFirstChild(player.Name)
-                    local character = player.Character or player.CharacterAdded:Wait()
-
-                    if vehicle and character then
-                        local humanoid = character:FindFirstChildWhichIsA("Humanoid")
-                        local driveSeat = vehicle:FindFirstChild("DriveSeat")
-
-                        if humanoid and driveSeat and humanoid.SeatPart ~= driveSeat then
-                            driveSeat:Sit(humanoid)
-                        end
-                    end
-                end
-
-                local function clickAtCoordinates(scaleX, scaleY, duration)
-                    local camera = game.Workspace.CurrentCamera
-                    local screenWidth = camera.ViewportSize.X
-                    local screenHeight = camera.ViewportSize.Y
-                    local VirtualInputManager = game:GetService("VirtualInputManager")
-                    local absoluteX = screenWidth * scaleX
-                    local absoluteY = screenHeight * scaleY
-                            
-                    VirtualInputManager:SendMouseButtonEvent(absoluteX, absoluteY, 0, true, game, 0)  
-                                
-                    if duration and duration > 0 then
-                        task.wait(duration)  
-                    end
-                                
-                    VirtualInputManager:SendMouseButtonEvent(absoluteX, absoluteY, 0, false, game, 0) 
-                end
-
-                local function plrTween(destination)
-                    local plr = game.Players.LocalPlayer
-                    local char = plr.Character
-
-                    if not char or not char.PrimaryPart then
-                        warn("Character or PrimaryPart not available.")
-                        return
-                    end
-
-                    local distance = (char.PrimaryPart.Position - destination).Magnitude
-
-                    if PlayerTeleportEnabled and distance < 25 then
-                        char:PivotTo(CFrame.new(destination))
-                        return
-                    end
-
-                    local tweenDuration = distance / plrTweenSpeed
-
-                    local TweenInfoToUse = TweenInfo.new(
-                        tweenDuration,
-                        Enum.EasingStyle.Linear,
-                        Enum.EasingDirection.Out
-                    )
-
-                    local TweenValue = Instance.new("CFrameValue")
-                    TweenValue.Value = char:GetPivot()
-
-                    TweenValue.Changed:Connect(function(newCFrame)
-                        char:PivotTo(newCFrame)
-                    end)
-
-                    local targetCFrame = CFrame.new(destination)
-                    local tween = TweenService:Create(TweenValue, TweenInfoToUse, { Value = targetCFrame })
-
-                    tween:Play()
-
-                    tween.Completed:Wait()
-                    TweenValue:Destroy()
-                end
-
-                local function interactWithVisibleMeshParts(folder)
-    if not folder then return end
-    local player = game.Players.LocalPlayer
+local function isPoliceNearby()
     local policeTeam = game:GetService("Teams"):FindFirstChild("Police")
-    if not policeTeam then return end
+    if not policeTeam then return false end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= Player and plr.Team == policeTeam and plr.Character then
+            local pHRP = plr.Character:FindFirstChild("HumanoidRootPart")
+            if pHRP and HumanoidRootPart and (pHRP.Position - HumanoidRootPart.Position).Magnitude <= Config.policeCheckRange then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function isPlayerHurt()
+    local char = Player.Character
+    if not char then return false end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.Health <= Config.lowHealthThreshold
+end
+
+local function isPlayerWanted()
+    local char = Player.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp and hrp:GetAttribute("IsWanted") then return true end
+    if hrp and hrp:GetAttribute("WantedLevel") and hrp:GetAttribute("WantedLevel") > 0 then return true end
+    return false
+end
+
+local function waitUntilNotWanted()
+    if not isPlayerWanted() then return end
+    while isPlayerWanted() do
+        task.wait(2)
+    end
+    task.wait(1)
+end
+
+local function updateStats()
+    local pg = Player:FindFirstChild("PlayerGui")
+    if not pg then return end
+    pcall(function()
+        for _, e in pairs(pg:GetDescendants()) do
+            if (e:IsA("TextLabel") or e:IsA("TextButton") or e:IsA("TextBox")) and e.Text then
+                if string.find(e.Text, "€") and not string.find(e.Text:lower(), "stolen") then
+                    local amount = string.match(e.Text, "([%d%.]+[kKmM]?)%s*€")
+                    if amount then Stats.currentBalance = amount; break end
+                end
+            end
+        end
+    end)
+end
+
+local function sendEndReport()
+    if WebhookUrl == "" then return end
+    updateStats()
+    local data = {
+        content = "",
+        embeds = {{
+            title = "Autorob",
+            color = 0,
+            description = "**Information about this lobby:**",
+            fields = {
+                {
+                    name = "Statistics",
+                    value = string.format(
+                        "> **Bombs Purchased:** %d\n> **Robbed:** %d\n> **Already Robbed:** %d\n> **Current Money:** %s €",
+                        RobberyStats.bombsPurchased, RobberyStats.safesRobbed,
+                        RobberyStats.alreadyRobbedIgnored, Stats.currentBalance
+                    ),
+                    inline = true,
+                },
+                {
+                    name = "Player Info",
+                    value = string.format("> **Name:** %s\n> **Server ID:** %s", Player.Name, game.JobId),
+                    inline = true,
+                },
+            },
+            footer = { text = "NightSystem" },
+            timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        }},
+    }
+    local encoded = HttpService:JSONEncode(data)
+    local requestFunc = request or http_request or (syn and syn.request)
+    if requestFunc then
+        pcall(function()
+            requestFunc({
+                Url = WebhookUrl,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = encoded,
+            })
+        end)
+    end
+end
+
+local function clickAtCoordinates(scaleX, scaleY, duration)
+    local cam = Workspace.CurrentCamera
+    local ax = cam.ViewportSize.X * scaleX
+    local ay = cam.ViewportSize.Y * scaleY
+    VirtualInputManager:SendMouseButtonEvent(ax, ay, 0, true, game, 0)
+    if duration and duration > 0 then task.wait(duration) end
+    VirtualInputManager:SendMouseButtonEvent(ax, ay, 0, false, game, 0)
+end
+
+local function ensurePlayerInVehicle()
+    local vehicle = workspace:FindFirstChild("Vehicles") and workspace.Vehicles:FindFirstChild(Player.Name)
+    local char = Player.Character or Player.CharacterAdded:Wait()
+    if vehicle and char then
+        local humanoid = char:FindFirstChildWhichIsA("Humanoid")
+        local driveSeat = vehicle:FindFirstChild("DriveSeat")
+        if humanoid and driveSeat and humanoid.SeatPart ~= driveSeat then
+            driveSeat:Sit(humanoid)
+        end
+    end
+end
+
+local function tweenTo(destination)
+    local car = Workspace.Vehicles[Player.Name]
+    if not car then return end
+    car:SetAttribute("ParkingBrake", true)
+    car:SetAttribute("Locked", true)
+    if car:FindFirstChild("DriveSeat") then
+        car.PrimaryPart = car.DriveSeat
+        car.DriveSeat:Sit(Player.Character.Humanoid)
+    end
+    ensurePlayerInVehicle()
+    local currentPos = car.PrimaryPart.Position
+    local distance = (Vector3.new(currentPos.X,0,currentPos.Z) - Vector3.new(destination.X,0,destination.Z)).Magnitude
     
-    local function isPoliceNearby()
-        for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
-            if plr.Team == policeTeam and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local distance = (plr.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                if distance <= policeAbort then
-                    return true
-                end
+    if not State.autoVehicleTPToggle then
+        local lowY = -1
+        local tweenDuration = distance / VehicleSpeedMultiplier
+        local TweenValue = Instance.new("CFrameValue")
+        TweenValue.Value = car:GetPivot()
+        local connection
+        connection = TweenValue.Changed:Connect(function(newCFrame)
+            local fixedCF = CFrame.new(newCFrame.Position.X, lowY, newCFrame.Position.Z)
+            car:PivotTo(fixedCF)
+            if car.DriveSeat then
+                car.DriveSeat.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                car.DriveSeat.AssemblyAngularVelocity = Vector3.new(0,0,0)
             end
-        end
-        return false
-    end
-
-    local meshParts = {}
-    for _, meshPart in ipairs(folder:GetChildren()) do
-        if meshPart:IsA("MeshPart") and meshPart.Transparency == 0 then
-            table.insert(meshParts, meshPart)
-        end
-    end
-
-    table.sort(meshParts, function(a, b)
-        local aDist = (a.Position - player.Character.HumanoidRootPart.Position).Magnitude
-        local bDist = (b.Position - player.Character.HumanoidRootPart.Position).Magnitude
-        return aDist < bDist
-    end)
-
-    for _, meshPart in ipairs(meshParts) do
-        if checkForBomb() or isPoliceNearby() or player.Character.Humanoid.Health <= abortHealth then
-            return
-        end
-
-        if meshPart.Transparency == 1 then
-            continue
-        end
-
-        local isMoney = (meshPart.Name == "Money" or (meshPart.Parent and meshPart.Parent.Name == "Money"))
-
-        if isMoney then
-            local args = {meshPart, "wEW", true}
-            robRemoteEvent:FireServer(unpack(args))
-            task.wait(ProximityPromptTimeBet)
-            args[3] = false
-            robRemoteEvent:FireServer(unpack(args))
-        else
-            local args = {meshPart, "2Lo", false} -- Geändert auf false für Gold
-            robRemoteEvent:FireServer(unpack(args))
-            task.wait(ProximityPromptTimeBet)
-            args[3] = true
-            robRemoteEvent:FireServer(unpack(args))
+        end)
+        local tween = TweenService:Create(TweenValue, TweenInfo.new(tweenDuration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), { Value = CFrame.new(destination.X, lowY, destination.Z) })
+        tween:Play()
+        tween.Completed:Wait()
+        connection:Disconnect()
+        TweenValue:Destroy()
+        car:PivotTo(CFrame.new(destination))
+        car:SetAttribute("ParkingBrake", true)
+        car:SetAttribute("Locked", true)
+    else
+        local lowY = -1
+        local tweenDuration = distance / VehicleSpeedMultiplier
+        local TweenValue = Instance.new("CFrameValue")
+        TweenValue.Value = car:GetPivot()
+        local teleportExecuted = false
+        local connection
+        connection = TweenValue.Changed:Connect(function(newCFrame)
+            if teleportExecuted then return end
+            local fixedCF = CFrame.new(newCFrame.Position.X, lowY, newCFrame.Position.Z)
+            car:PivotTo(fixedCF)
+            if car.DriveSeat then
+                car.DriveSeat.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                car.DriveSeat.AssemblyAngularVelocity = Vector3.new(0,0,0)
+            end
+            local d = (Vector3.new(fixedCF.Position.X,0,fixedCF.Position.Z) - Vector3.new(destination.X,0,destination.Z)).Magnitude
+            if d < Config.fastTeleportDistance then
+                teleportExecuted = true
+                connection:Disconnect()
+                car:PivotTo(CFrame.new(destination))
+                car:SetAttribute("ParkingBrake", true)
+                car:SetAttribute("Locked", true)
+                TweenValue:Destroy()
+            end
+        end)
+        local tween = TweenService:Create(TweenValue, TweenInfo.new(tweenDuration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), { Value = CFrame.new(destination.X, lowY, destination.Z) })
+        tween:Play()
+        tween.Completed:Wait()
+        if not teleportExecuted then
+            if connection then connection:Disconnect() end
+            TweenValue:Destroy()
+            car:PivotTo(CFrame.new(destination))
+            car:SetAttribute("ParkingBrake", true)
+            car:SetAttribute("Locked", true)
         end
     end
 end
 
-                local function interactWithVisibleMeshParts2(folder)
+local function teleportPlayer(destination)
+    local char = Player.Character
+    if not char or not char.PrimaryPart then return end
+    if State.fastTeleportToggle then
+        char:SetPrimaryPartCFrame(CFrame.new(destination))
+    else
+        local dist = (char.PrimaryPart.Position - destination).Magnitude
+        local tweenDuration = math.max(0.5, dist / Config.playerSpeed)
+        local tween = TweenService:Create(char.PrimaryPart, TweenInfo.new(tweenDuration, Enum.EasingStyle.Linear), { CFrame = CFrame.new(destination) })
+        tween:Play()
+        tween.Completed:Wait()
+    end
+end
+
+local function teleportToBankPosition(position)
+    teleportPlayer(position)
+end
+
+local function JumpOut()
+    local char = Player.Character or Player.CharacterAdded:Wait()
+    local humanoid = char:FindFirstChild("Humanoid")
+    if humanoid and humanoid.SeatPart then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end
+
+local function SpawnBomb()
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
+    task.wait(0.1)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
+    task.wait(0.5)
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+end
+
+local function hasDetonationItem()
+    local function check(container)
+        for _, item in ipairs(container:GetChildren()) do
+            if item:IsA("Tool") and item.Name == DetonationItem then return true end
+        end
+        return false
+    end
+    return check(Player.Backpack) or check(Player.Character)
+end
+
+local function MoveToDealer()
+    local vehicle = workspace.Vehicles:FindFirstChild(Player.Name)
+    if not vehicle then sendNotification("Error", "No vehicle found."); return end
+    local dealers = workspace:FindFirstChild("Dealers")
+    if not dealers then
+        sendNotification("Error", "Dealers not found.")
+        OpenCrimeApp()
+        task.wait(0.75)
+        sendEndReport()
+        tweenTo(REJOIN_POSITION)
+        ensurePlayerInVehicle()
+        tweenTo(REJOIN_POSITION)
+        task.wait(1)
+        Player:Kick("NightSystem Autorob - ServerHop")
+        return
+    end
+    local closest, shortest = nil, math.huge
+    for _, dealer in pairs(dealers:GetChildren()) do
+        if dealer:FindFirstChild("Head") then
+            local dist = (Character.HumanoidRootPart.Position - dealer.Head.Position).Magnitude
+            if dist < shortest then shortest = dist; closest = dealer.Head end
+        end
+    end
+    if not closest then
+        sendNotification("Error", "Dealers not found.")
+        tweenTo(Vector3.new(-1241.8756103515625, -23.776233673095703, 3719.95849609375))
+        tweenTo(Vector3.new(-1241.78857421875, -358.98175048828125, 3718.096435546875))
+        task.wait(0.5)
+        Player:Kick("NightSystem Autorob - ServerHop")
+        return
+    end
+    tweenTo(closest.Position + Vector3.new(0, 5, 0))
+end
+
+local HealthTripwire = false
+
+local function HealthCheck()
+    local function watchChar(char)
+        local humanoid = char:WaitForChild("Humanoid")
+        humanoid.HealthChanged:Connect(function(health)
+            if HealthTripwire or not State.autorobToggle then return end
+            if health > 0 and health <= Config.lowHealthThreshold then
+                HealthTripwire = true
+                State.isRobbing = false
+                disableInvisible()
+                sendNotification("Low Health", "Server hopping...")
+              FirstRejoin()
+            end
+        end)
+        humanoid.Died:Connect(function()
+            if HealthTripwire or not State.autorobToggle then return end
+            HealthTripwire = true
+            State.isRobbing = false
+            disableInvisible()
+            sendNotification("Low Health", "Server hopping...")
+            task.wait(0.5)
+            sendEndReport()
+            task.wait(0.3)
+            Player:Kick("NightSystem Autorob - ServerHop")
+        end)
+    end
+    watchChar(Player.Character or Player.CharacterAdded:Wait())
+    Player.CharacterAdded:Connect(function(char)
+        HealthTripwire = false
+        watchChar(char)
+    end)
+end
+
+local function lootVisibleMeshParts(folder)
     if not folder then return end
-    local player = game.Players.LocalPlayer
-    local policeTeam = game:GetService("Teams"):FindFirstChild("Police")
-    if not policeTeam then return end
-
-    local function isPoliceNearby()
-        for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
-            if plr.Team == policeTeam and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local distance = (plr.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                if distance <= policeAbort then
-                    return true
-                end
-            end
-        end
-        return false
+    if isPlayerHurt() then
+        sendNotification("Low Health", "Looting aborted")
+        State.isRobbing = false
+        return
     end
-
+    local currentChar = Player.Character
+    local currentHRP = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
+    if not currentChar or not currentHRP then return end
     local meshParts = {}
-    for _, meshPart in ipairs(folder:GetChildren()) do
-        if meshPart:IsA("MeshPart") and meshPart.Transparency == 0 then
-            table.insert(meshParts, meshPart)
+    for _, mp in ipairs(folder:GetDescendants()) do
+        if mp:IsA("MeshPart") and mp.Transparency == 0 and not State.collected[mp] then
+            table.insert(meshParts, mp)
         end
     end
-
     table.sort(meshParts, function(a, b)
-        local aDist = (a.Position - player.Character.HumanoidRootPart.Position).Magnitude
-        local bDist = (b.Position - player.Character.HumanoidRootPart.Position).Magnitude
-        return aDist < bDist
+        return (a.Position - currentHRP.Position).Magnitude < (b.Position - currentHRP.Position).Magnitude
     end)
-
-    for i, meshPart in ipairs(meshParts) do
-        if checkForBomb() or isPoliceNearby() or player.Character.Humanoid.Health <= abortHealth then
+    for _, mp in ipairs(meshParts) do
+        if not currentChar or not currentHRP then break end
+        if isPoliceNearby() and State.isRobbing then
+            sendNotification("Police Nearby", "Looting aborted")
+            State.isRobbing = false
             return
         end
-
-        if meshPart.Transparency == 1 then
-            return
+        if isPlayerHurt() then State.isRobbing = false; return end
+        if mp.Transparency == 0 and (mp.Position - currentHRP.Position).Magnitude <= Config.range then
+            State.collected[mp] = true
+            task.spawn(function()
+                local code = mp.Parent and mp.Parent.Name == "Money" and Codes.money or Codes.items
+                RemoteEvents.rob:FireServer(mp, code, true)
+                task.wait(Config.proximityPromptTime)
+                RemoteEvents.rob:FireServer(mp, code, false)
+                if mp and mp.Parent then State.collected[mp] = nil end
+            end)
+            task.wait(0.05)
         end
-
-        plrTween(meshPart.Position)
-        
-        local isMoney = (meshPart.Name == "Money" or (meshPart.Parent and meshPart.Parent.Name == "Money"))
-
-        if isMoney then
-            local args3 = {
-                [1] = meshPart,
-                [2] = "wEW",
-                [3] = true,
-            }
-            robRemoteEvent:FireServer(unpack(args3))
-            task.wait(ProximityPromptTimeBet)
-            args3[3] = false
-            robRemoteEvent:FireServer(unpack(args3))
-        else
-            local args4 = {
-                [1] = meshPart,
-                [2] = "2Lo",
-                [3] = false, -- Geändert auf false für Gold
-            }
-            robRemoteEvent:FireServer(unpack(args4))
-            task.wait(ProximityPromptTimeBet)
-            args4[3] = true
-            robRemoteEvent:FireServer(unpack(args4))
-        end
-
-        task.wait(0.1)
     end
 end
 
-                local function startAutoCollect()
-                    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-                    local Workspace = game:GetService("Workspace")
-                    local Players = game:GetService("Players")
+local function handlePlayerHurt()
+    if isPlayerHurt() then
+        sendNotification("Low Health", "Moving to safe position...")
+        disableInvisible()
+        ensurePlayerInVehicle()
+        task.wait(0.5)
+        if workspace:FindFirstChild("Vehicles") and workspace.Vehicles:FindFirstChild(Player.Name) then
+            tweenTo(REJOIN_POSITION)
+        else
+            teleportPlayer(REJOIN_POSITION)
+        end
+        ensurePlayerInVehicle()
+        waitUntilNotWanted()
+        sendEndReport()
+        task.wait(0.5)
+        Rejoin()
+        task.wait(5)
+        return true
+    end
+    return false
+end
 
-                    local Player = Players.LocalPlayer
-                    local Character = Player.Character or Player.CharacterAdded:Wait()
-                    local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local function checkSafeRobStatus()
+    task.wait(1)
+    local robberiesFolder = Workspace:FindFirstChild("Robberies")
+    if not robberiesFolder then return false end
+    local jewelerSafeFolder = robberiesFolder:FindFirstChild("Jeweler Safe Robbery")
+    if not jewelerSafeFolder then return false end
+    local jewelerFolder = jewelerSafeFolder:FindFirstChild("Jeweler")
+    if not jewelerFolder then return false end
+    local doorFolder = jewelerFolder:FindFirstChild("Door")
+    if not doorFolder then return false end
+    local targetPart
+    for _, v in ipairs(doorFolder:GetDescendants()) do
+        if v:IsA("BasePart") then targetPart = v; break end
+    end
+    if not targetPart then return false end
+    local _, y, _ = targetPart.CFrame:ToEulerAnglesYXZ()
+    y = math.deg(y) % 360
+    return math.abs(y - 90) < 10 or math.abs(y - 270) < 10
+end
 
-                    local Collected = {}
-                    local ProximityPromptTimeBet = 2.5
-                    local Range = 30
-                    local Robberies = {}
-
-                    for _, d in ipairs(Workspace:GetDescendants()) do
-                        if d:IsA("Folder") then
-                            local n = d.Name:lower()
-                            if n:find("robbery") or n:find("robberies") then
-                                table.insert(Robberies, d)
-                            end
-                        end
-                    end
-
-                    Workspace.DescendantAdded:Connect(function(d)
-                        if d:IsA("Folder") then
-                            local n = d.Name:lower()
-                            if n:find("robbery") or n:find("robberies") then
-                                table.insert(Robberies, d)
-                            end
-                        end
-                    end)
-
-                    local function loot(folder)
-    for _, m in ipairs(folder:GetDescendants()) do
-        if m:IsA("MeshPart") and m.Transparency == 0 then
-            if HumanoidRootPart and not Collected[m] and (m.Position - HumanoidRootPart.Position).Magnitude <= Range then
-                Collected[m] = true
-                task.spawn(function()
-                    local a
-                    -- Prüft, ob das Objekt selbst oder der Ordner "Money" heißt
-                    local isMoney = (m.Name == "Money" or (m.Parent and m.Parent.Name == "Money"))
-                    
-                    if isMoney then
-                        -- Money: Code "wEW" und 3. Argument = true (laut Remote Spy)
-                        a = {m, "wEW", true}
-                        robRemoteEvent:FireServer(unpack(a))
-                        task.wait(ProximityPromptTimeBet)
-                        a[3] = false
-                        robRemoteEvent:FireServer(unpack(a))
-                    else
-                        -- Gold / Rest: Code "2Lo" und 3. Argument = false (laut Remote Spy)
-                        a = {m, "2Lo", false}
-                        robRemoteEvent:FireServer(unpack(a))
-                        task.wait(ProximityPromptTimeBet)
-                        a[3] = true
-                        robRemoteEvent:FireServer(unpack(a))
-                    end
-                    
-                    if m and m.Parent and m.Transparency == 0 then
-                        Collected[m] = nil
-                    end
+local function Rejoin()
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/7711635737/servers/Public?sortOrder=Asc&limit=100"))
+    end)
+    
+    if ok and data and data.data then
+        for _, server in ipairs(data.data) do
+            if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                pcall(function()
+                    TeleportService:TeleportToPlaceInstance(7711635737, server.id, Player)
                 end)
+                task.wait(3)
+                Player:Kick("NightSystem Autorob - ServerHop")
+                return
             end
         end
     end
+    
+    pcall(function()
+        TeleportService:Teleport(7711635737, Player)
+    end)
+    
+    task.wait(3)
+    Player:Kick("NightSystem Autorob - ServerHop")
 end
 
-                    while autorobBankClubToggle or autorobContainersToggle do
-                        for _, r in ipairs(Robberies) do
-                            if r and r.Parent then
-                                loot(r)
-                            end
-                        end
-                        task.wait(0.5)
-                    end
-                end
-
-                -- ============================================================
-                -- NEUES TWEEN (instant drop auf Y=-5, dann linear zum Ziel)
-                -- ============================================================
-                local function tweenTo(destination)
-                    local plr = game.Players.LocalPlayer
-                    local car = Workspace.Vehicles[plr.Name]
-
-                    car:SetAttribute("ParkingBrake", true)
-                    car:SetAttribute("Locked", true)
-
-                    car.PrimaryPart = car:FindFirstChild("DriveSeat", true)
-                    local driveSeat = car.DriveSeat
-                    driveSeat:Sit(plr.Character.Humanoid)
-
-                    -- Step 1: INSTANT drop auf Y=-5, kein Tween
-                    -- Egal ob auf Gebäude Y=40 oder Boden Y=5 — sofort runter
-                    local currentPivot = car:GetPivot()
-                    local dropY = -5
-                    car:PivotTo(CFrame.new(Vector3.new(currentPivot.X, dropY, currentPivot.Z)))
-                    driveSeat.AssemblyLinearVelocity = Vector3.zero
-                    driveSeat.AssemblyAngularVelocity = Vector3.zero
-                    task.wait(0.05)
-
-                    -- Step 2: Linear tween von Y=-5 direkt zum Ziel, konstante Geschwindigkeit
-                    local startPos = Vector3.new(currentPivot.X, dropY, currentPivot.Z)
-                    local distance = (startPos - destination).Magnitude
-
-                    if distance > 0.5 then
-                        local speedVariance = tweenSpeed * (0.92 + math.random() * 0.16)
-                        local tweenDuration = distance / speedVariance
-
-                        local TweenInfoToUse = TweenInfo.new(
-                            tweenDuration,
-                            Enum.EasingStyle.Linear,
-                            Enum.EasingDirection.Out
-                        )
-
-                        local TweenValue = Instance.new("CFrameValue")
-                        TweenValue.Value = car:GetPivot()
-
-                        TweenValue.Changed:Connect(function(newCFrame)
-                            car:PivotTo(newCFrame)
-                            -- Minimaler Jitter für natürlicheres Verhalten
-                            local jitter = Vector3.new(
-                                (math.random() - 0.5) * 0.08,
-                                0,
-                                (math.random() - 0.5) * 0.08
-                            )
-                            driveSeat.AssemblyLinearVelocity  = jitter
-                            driveSeat.AssemblyAngularVelocity = Vector3.zero
-                        end)
-
-                        local tween = TweenService:Create(
-                            TweenValue,
-                            TweenInfoToUse,
-                            { Value = CFrame.new(destination) }
-                        )
-
-                        tween:Play()
-                        tween.Completed:Wait()
-                        TweenValue:Destroy()
-                    end
-
-                    -- Exakt auf Zielposition setzen
-                    car:PivotTo(CFrame.new(destination))
-                    driveSeat.AssemblyLinearVelocity = Vector3.zero
-                    driveSeat.AssemblyAngularVelocity = Vector3.zero
-
-                    car:SetAttribute("ParkingBrake", true)
-                    car:SetAttribute("Locked", true)
-                end
-                -- ============================================================
-
-                local TeleportService = game:GetService("TeleportService")
-                local Players = game:GetService("Players")
-                local HttpService = game:GetService("HttpService")
-                local player = Players.LocalPlayer
-
-                local function MoveToDealer()
-                    local player = game:GetService("Players").LocalPlayer
-                    local character = player.Character or player.CharacterAdded:Wait()
-                    local vehicle = workspace.Vehicles:FindFirstChild(player.Name)
-                    if not vehicle then
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Error",
-                            Text = "No vehicle found.",
-                            Duration = 3,
-                        })
-                        return
-                    end
-
-                    local dealers = workspace:FindFirstChild("Dealers")
-                    if not dealers then
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Error",
-                            Text = "Dealers not found.",
-                            Duration = 3,
-                        })
-                        tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
-						task.wait(1)
-                        performServerHop()
-                        return
-                    end
-
-                    local closest, shortest = nil, math.huge
-                    for _, dealer in pairs(dealers:GetChildren()) do
-                        if dealer:FindFirstChild("Head") then
-                            local dist = (character.HumanoidRootPart.Position - dealer.Head.Position).Magnitude
-                            if dist < shortest then
-                                shortest = dist
-                                closest = dealer.Head
-                            end
-                        end
-                    end
-
-                    if not closest then
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Error",
-                            Text = "No dealer found.",
-                            Duration = 3,
-                        })
-                        tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
-						task.wait(1)
-                        performServerHop()
-                        return
-                    end
-
-                    local destination1 = closest.Position + Vector3.new(0, 5, 0)
-                    tweenTo(destination1)
-                end
-
-                local function robBankAndClub()
-                    local player = game.Players.LocalPlayer
-                    local character = player.Character or player.CharacterAdded:Wait()
-                    local humanoid = character:WaitForChild("Humanoid")
-                    local camera = game.Workspace.CurrentCamera
-
-                    local function lockCamera()
-                        local rootPart = character.HumanoidRootPart
-                        local backOffset = rootPart.CFrame.LookVector * -6
-                        local cameraPosition = rootPart.Position + backOffset + Vector3.new(0, 5, 0) 
-                        local lookAtPosition = rootPart.Position + Vector3.new(0, 2, 0) 
-                        camera.CFrame = CFrame.new(cameraPosition, lookAtPosition)
-                    end
-
-                    game:GetService("RunService").Heartbeat:Connect(lockCamera)
-                    local musikPos = Vector3.new(-1739.5330810546875, 11, 3052.31103515625)
-                    local musikStand = Vector3.new(-1744.177001953125, 11.125, 3012.20263671875)
-                    local musikSafe = Vector3.new(-1743.4300537109375, 11.124999046325684, 3049.96630859375) 
-                    ensurePlayerInVehicle()
-                    task.wait(.5)
-                    clickAtCoordinates(0.5, 0.9)
-                    task.wait(.5)
-                    tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
-                    task.wait(.5)
-
-                    local musikPart = workspace.Robberies["Club Robbery"].Club.Door.Accessory.Black
-                    local bankPart = Workspace.Robberies.BankRobbery.VaultDoor["Meshes/Tresor_Plane (2)"]
-                    local bankLight = game.Workspace.Robberies.BankRobbery.LightGreen.Light
-                    local bankLight2 = game.Workspace.Robberies.BankRobbery.LightRed.Light
-                            if autoSellToggle == true then
-                                ensurePlayerInVehicle()
-                                MoveToDealer()
-                                task.wait(0.5)
-
-                                args = {
-                                    [1] = "Gold",
-                                    [2] = "Dealer"
-                                }
-                                sellRemoteEvent:FireServer(unpack(args))
-                                sellRemoteEvent:FireServer(unpack(args))
-                                sellRemoteEvent:FireServer(unpack(args))
-
-                                tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
-
-                            ensurePlayerInVehicle()
-                            tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
-					ensurePlayerInVehicle()
-                    tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
-                    
-                    if musikPart.Rotation == Vector3.new(180, 0, 180) then
-                        clickAtCoordinates(0.5, 0.9)
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Safe is open",
-                            Text = "Going to rob",
-                        })
-
-                        local hasBomb = plr.Character:FindFirstChild("Bomb") or plr.Backpack:FindFirstChild("Bomb") 
-                        if not hasBomb then
-                            ensurePlayerInVehicle()
-                            MoveToDealer()
-                            task.wait(0.5)
-                            args = {[1] = "Bomb", [2] = "Dealer"}
-                            buyRemoteEvent:FireServer(unpack(args))
-                            task.wait(0.5)
-                        end
-
-                        ensurePlayerInVehicle()
-                        tweenTo(musikPos)
-                        task.wait(0.5)
-                        JumpOut()
-                        task.wait(0.5)
-
-                        plrTween(Vector3.new(-1744.177001953125, 11.125, 3017.20263671875))
-                        task.wait(0.5)
-
-                        args = {[1] = "Bomb"}
-                        EquipRemoteEvent:FireServer(unpack(args))
-                        task.wait(0.5)
-                        
-                        local tool = plr.Character:FindFirstChild("Bomb")
-                        if tool then
-                            SpawnBomb()
-                        else
-                            warn("Tool 'Bomb' not found in the Backpack!")
-                        end
-
-                        task.wait(0.5)
-                        fireBombRemoteEvent:FireServer()
-
-                        plrTween(musikSafe)
-                        task.wait(1.8)
-                        plrTween(musikStand)
-
-                        safeFolder = workspace.Robberies["Club Robbery"].Club
-                        interactWithVisibleMeshParts(safeFolder:FindFirstChild("Items"))
-                        interactWithVisibleMeshParts(safeFolder:FindFirstChild("Money"))
-                        task.wait(0.5)
-
-                        ensurePlayerInVehicle()
-                        tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
-
-                    else
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Safe is not open",
-                            Text = "Going to Bank",
-                        })
-                    end
-                        ensurePlayerInVehicle()
-                        tweenTo(Vector3.new(-1370.972412109375, 5.499999046325684, 3127.154541015625))
-                    else
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Safe is not open",
-                            Text = "Going to Bank",
-                        })
-                end
-
-                    if bankLight2.Enabled == false and bankLight.Enabled == true then
-                        clickAtCoordinates(0.5, 0.9)
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Bank is open",
-                            Text = "Going to rob",
-                        })
-
-                        ensurePlayerInVehicle()
-                        local hasBomb1 = false
-                        
-                        local function checkContainer(container)
-                            for _, item in ipairs(container:GetChildren()) do
-                                if item:IsA("Tool") and item.Name == "Bomb" then
-                                    return true
-                                end
-                            end
-                            return false
-                        end
-
-                        hasBomb1 = checkContainer(plr.Backpack) or checkContainer(plr.Character)
-                        if not hasBomb1 then
-                            ensurePlayerInVehicle()
-                            task.wait(0.5)
-                            MoveToDealer()
-                            task.wait(0.5)
-                            MoveToDealer()
-                            task.wait(0.5)
-                            args = {
-                                [1] = "Bomb",
-                                [2] = "Dealer"
-                            }
-                            buyRemoteEvent:FireServer(unpack(args))
-                            task.wait(0.5)
-                        end
-                        
-                        tweenTo(Vector3.new(-1202.86181640625, 7.877995491027832, 3164.614501953125))
-                        tweenTo(Vector3.new(-1202.86181640625, 7.877995491027832, 3164.614501953125))
-                        JumpOut()
-                        task.wait(.5)
-                        plrTween(Vector3.new(-1242.367919921875, 7.749999046325684, 3144.705322265625))
-                        task.wait(.5)
-                        args = {
-                            [1] = "Bomb"
-                        }
-                        EquipRemoteEvent:FireServer(unpack(args))
-                        task.wait(.5)
-                        
-                        tool = plr.Character:FindFirstChild("Bomb")
-                        if tool then
-                            SpawnBomb()
-                        else
-                            warn("Tool 'Bomb' not found in the Backpack!")
-                        end
-
-                        task.wait(0.5)
-                        fireBombRemoteEvent:FireServer()
-                        plrTween(Vector3.new(-1246.291015625, 7.749999046325684, 3120.8505859375))
-                        task.wait(2.5)
-                        safeFolder = Workspace.Robberies.BankRobbery
-                        plrTween(Vector3.new(-1249.6793212890625, 7.7235636711120605, 3121.9423828125))
-                        task.wait(6)
-                        plrTween(Vector3.new(-1231.2696533203125, 7.7235002517700195, 3123.935546875))
-                        task.wait(6)
-                        plrTween(Vector3.new(-1246.9879150390625, 7.7235002517700195, 3103.03955078125))
-                        task.wait(6)
-                        plrTween(Vector3.new(-1235.13720703125, 7.7235002517700195, 3103.102783203125))
-                        task.wait(6)
-                        ensurePlayerInVehicle()
-                        tweenTo(Vector3.new(-1143.7784423828125, 5.724719047546387, 3457.9404296875))
-
-                    else
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Bank is not open",
-                            Text = "Going to Jeweler",
-                        })
-                        ensurePlayerInVehicle()
-                        tweenTo(Vector3.new(-1143.7784423828125, 5.724719047546387, 3457.9404296875))
-                    end
-
-                    local JewelerPart = workspace.Robberies["Jeweler Safe Robbery"].Jeweler.Door.Accessory.Black
-                    local JewelerPos = Vector3.new(-426.5001220703125, 21.522781372070312, 3576.979248046875)
-                    local JewelerStand = Vector3.new(-439.0592041015625, 21.223413467407227, 3553.52783203125)
-                    local JewelerSafe = Vector3.new(-407.1869201660156, 21.223413467407227, 3551.096435546875)
-
-                    if JewelerPart.Rotation == Vector3.new(0, -90, 0) then
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Jeweler Safe is open",
-                            Text = "Going to rob",
-                        })
-
-                        local hasBomb = plr.Character:FindFirstChild("Bomb") or plr.Backpack:FindFirstChild("Bomb") 
-                        if not hasBomb then
-                            ensurePlayerInVehicle()
-                            MoveToDealer()
-                            task.wait(0.5)
-                            args = {[1] = "Bomb", [2] = "Dealer"}
-                            buyRemoteEvent:FireServer(unpack(args))
-                            task.wait(0.5)
-                        end
-
-                        ensurePlayerInVehicle()
-                        tweenTo(JewelerPos)
-                        task.wait(0.5)
-                        JumpOut()
-                        task.wait(0.5)
-
-                        plrTween(Vector3.new(-437.28814697265625, 21.223413467407227, 3553.262939453125))
-                        task.wait(0.5)
-
-                        args = {[1] = "Bomb"}
-                        EquipRemoteEvent:FireServer(unpack(args))
-                        task.wait(0.5)
-                        
-                        local tool = plr.Character:FindFirstChild("Bomb")
-                        if tool then
-                            SpawnBomb()
-                        else
-                            warn("Tool 'Bomb' not found in the Backpack!")
-                        end
-
-                        task.wait(0.5)
-                        fireBombRemoteEvent:FireServer()
-
-                        plrTween(JewelerSafe)
-                        task.wait(1.8)
-                        plrTween(JewelerStand)
-
-                        safeFolder = workspace.Robberies["Jeweler Safe Robbery"].Jeweler
-                        interactWithVisibleMeshParts(safeFolder:FindFirstChild("Items"))
-                        interactWithVisibleMeshParts(safeFolder:FindFirstChild("Money"))
-                        task.wait(0.5)
-
-                        ensurePlayerInVehicle()
-                        tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
-						task.wait(1)
-                        performServerHop()
-                    else
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Jeweler Safe is not open",
-                            Text = "Going to Server Hop",
-                        })
-                        tweenTo(Vector3.new(-1292.9005126953125, -423.63556671142578, 3685.330810546875))
-						task.wait(1)
-                        performServerHop()
-                    end
-                end
-
-                while task.wait() do
-                    if (autorobBankClubToggle or autorobContainersToggle) then
-                        task.spawn(startAutoCollect)
-                    end
-                    
-                    if autorobBankClubToggle == true then
-                        robBankAndClub()
-                    end
-                end
-
-                local function robContainers()
-                    tweenTo(Vector3.new(1058.7470703125, 5.733738899230957, 2218.6943359375))
-                    task.wait(.5)
-                    
-                    local containerFolder = workspace.Robberies.ContainerRobberies
-                    local containers = {}
-                    
-                    local function getContainerRobberies(folder)
-                        local result = {}
-                        for _, model in ipairs(folder:GetChildren()) do
-                            if model.Name == "ContainerRobbery" then
-                                table.insert(result, model)
-                            end
-                        end
-                        return result
-                    end
-
-                    containers = getContainerRobberies(containerFolder) 
-
-                    container1 = containers[1]
-                    container2 = containers[2]
-                    con1Planks = container1:FindFirstChild("WoodPlanks", true)
-                    con2Planks = container2:FindFirstChild("WoodPlanks", true)
-                                
-                    function isPoliceNearby()
-                        local policeTeam = game:GetService("Teams"):FindFirstChild("Police")
-                        for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
-                            if plr.Team == policeTeam and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                                local distance = (plr.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                                if distance <= policeAbort then
-                                    return true
-                                end
-                            end
-                        end
-                        return false
-                    end
-
-                    if con1Planks.Transparency == 1 then
-                        ensurePlayerInVehicle()
-                        task.wait(.5)
-                        MoveToDealer()
-                        task.wait(.5)
-                        args = {
-                            [1] = "Bomb",
-                            [2] = "Dealer"
-                        }
-                        buyRemoteEvent:FireServer(unpack(args))
-                        task.wait(0.5)
-                        tweenTo(con1Planks.Position)
-                        tweenTo(con1Planks.Position)
-                        task.wait(0.5)
-                        JumpOut()
-                        task.wait(0.5)
-                        plrTween(con1Planks.Position)
-                        task.wait(0.5)
-                        args = {
-                            [1] = "Bomb"
-                        }
-                        EquipRemoteEvent:FireServer(unpack(args))
-                        task.wait(0.5)
-                        
-                        tool = plr.Character:FindFirstChild("Bomb")
-                        if tool then
-                            SpawnBomb()
-                        else
-                            warn("Tool 'Bomb' not found in the Backpack!")
-                        end
-
-                        task.wait(.5)
-                        fireBombRemoteEvent:FireServer()
-                        ensurePlayerInVehicle()
-                        tweenTo(Vector3.new(1096.401, 57.31, 2226.765))
-                        task.wait(2)
-                        tweenTo(con1Planks.Position)
-                        JumpOut()
-                        task.wait(.5)
-                        plrTween(con1Planks.Position)
-                        interactWithVisibleMeshParts2(container1:FindFirstChild("Items"))
-                        interactWithVisibleMeshParts2(container1:FindFirstChild("Items"))
-                        interactWithVisibleMeshParts2(container1:FindFirstChild("Money"))
-                        interactWithVisibleMeshParts2(container1:FindFirstChild("Money"))
-                        task.wait(.2)
-                        ensurePlayerInVehicle()
-                        task.wait(.2)
-                        tweenTo(Vector3.new(1096.401, 57.31, 2226.765))
-                    else
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Container1 not open",
-                            Text = "Going to Container2",
-                        })
-                    end
-
-                    if con2Planks.Transparency == 1 then
-                        ensurePlayerInVehicle()
-                        task.wait(.5)
-                        MoveToDealer()
-                        task.wait(.5)
-                        args = {
-                            [1] = "Bomb",
-                            [2] = "Dealer"
-                        }
-                        buyRemoteEvent:FireServer(unpack(args))
-                        task.wait(0.5)
-                        tweenTo(con2Planks.Position)
-                        task.wait(0.5)
-                        JumpOut()
-                        task.wait(.5)
-                        plrTween(con2Planks.Position)
-                        task.wait(0.5)
-                        args = {
-                            [1] = "Bomb"
-                        }
-                        EquipRemoteEvent:FireServer(unpack(args))
-                        task.wait(0.5)
-                        
-                        tool = plr.Character:FindFirstChild("Bomb")
-                        if tool then
-                            SpawnBomb()
-                        else
-                            warn("Tool 'Bomb' not found in the Backpack!")
-                        end
-
-                        task.wait(0.5)
-                        fireBombRemoteEvent:FireServer()
-                        ensurePlayerInVehicle()
-                        tweenTo(Vector3.new(1096.401, 57.31, 2226.765))
-                        task.wait(2)
-                        tweenTo(con2Planks.Position)
-                        JumpOut()
-                        task.wait(0.5)
-                        plrTween(con2Planks.Position)
-                        interactWithVisibleMeshParts2(container2:FindFirstChild("Items"))
-                        interactWithVisibleMeshParts2(container2:FindFirstChild("Items"))
-                        interactWithVisibleMeshParts2(container2:FindFirstChild("Money"))
-                        interactWithVisibleMeshParts2(container2:FindFirstChild("Money"))
-                        task.wait(0.5)
-                        ensurePlayerInVehicle()
-                        tweenTo(Vector3.new(1656.3526611328125, -25.936052322387695, 2821.137451171875))
-                        performServerHop()
-                    else
-                        game.StarterGui:SetCore("SendNotification", {
-                            Title = "Container2 not open",
-                            Text = "Hopping Server :^)",
-                        })
-                    end
-
-                    ensurePlayerInVehicle()
-                    tweenTo(Vector3.new(1656.3526611328125, -25.936052322387695, 2821.137451171875))
-                    performServerHop()
-                end
-
-                while task.wait() do
-                    if autorobBankClubToggle == true then
-                        robBankAndClub()
-                    end
-                    
-                    if autorobContainersToggle == true then
-                        robContainers()
-                    end
-                end
-
-                OrionLib:Init()
-                end
+local function OpenCrimeApp()
+    if not State.autorobToggle then return false end
+    local pg = Player:WaitForChild("PlayerGui")
+    RemoteEvents.OpenPhone:FireServer("Phone")
+    local gui
+    local attempts = 0
+    repeat
+        attempts = attempts + 1
+        for _, g in ipairs(pg:GetChildren()) do
+            if g:IsA("ScreenGui") and g.DisplayOrder == 29 and g.IgnoreGuiInset == true and g.ResetOnSpawn == false then
+                gui = g
                 break
             end
         end
-        task.wait(CHECK_INTERVAL)
+        if not gui then task.wait(0.5) end
+    until gui or attempts >= 30
+    if not gui then
+        RemoteEvents.OpenPhone:FireServer("Phone")
+        task.wait(1)
+        attempts = 0
+        repeat
+            attempts = attempts + 1
+            for _, g in ipairs(pg:GetChildren()) do
+                if g:IsA("ScreenGui") and g.DisplayOrder == 29 and g.IgnoreGuiInset == true and g.ResetOnSpawn == false then
+                    gui = g
+                    break
+                end
+            end
+            if not gui then task.wait(0.5) end
+        until gui or attempts >= 30
+    end
+    if not gui then RemoteEvents.ClosePhone:FireServer(); return false end
+    local frame
+    attempts = 0
+    repeat
+        attempts = attempts + 1
+        for _, obj in ipairs(gui:GetDescendants()) do
+            if obj:IsA("Frame") then
+                local pos = obj.Position
+                if math.abs(pos.X.Scale - 0.005) < 0.005 and math.abs(pos.Y.Scale - 0.995) < 0.005 and obj.AnchorPoint.Y == 1 then
+                    frame = obj
+                    break
+                end
+            end
+        end
+        if not frame then task.wait(0.5) end
+    until frame or attempts >= 20
+    if not frame then RemoteEvents.ClosePhone:FireServer(); return false end
+    task.wait(0.3)
+    local btn
+    for _, obj in ipairs(frame:GetDescendants()) do
+        if obj.Name == "Criminal" then btn = obj; break end
+    end
+    if not btn then
+        for _, obj in ipairs(frame:GetDescendants()) do
+            if (obj:IsA("TextButton") or obj:IsA("TextLabel")) and obj.Text == "Criminal" then btn = obj; break end
+        end
+    end
+    if not btn then RemoteEvents.ClosePhone:FireServer(); return false end
+    local p = btn.AbsolutePosition
+    local s = btn.AbsoluteSize
+    VirtualInputManager:SendMouseButtonEvent(p.X + s.X/2, p.Y + s.Y/2, 0, true, game, 1)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(p.X + s.X/2, p.Y + s.Y/2, 0, false, game, 1)
+    task.wait(0.5)
+    RemoteEvents.ClosePhone:FireServer()
+    return true
+end
+
+
+local function checkBankHasLoot()
+    local goldFolder = workspace.Robberies.BankRobbery.Gold
+    local moneyFolder = workspace.Robberies.BankRobbery.Money
+    
+    local hasGold = false
+    local hasMoney = false
+    
+    for _, item in ipairs(goldFolder:GetChildren()) do
+        if item:IsA("MeshPart") and item.Transparency == 0 then
+            hasGold = true
+            break
+        end
+    end
+    
+    for _, item in ipairs(moneyFolder:GetChildren()) do
+        if item:IsA("MeshPart") and item.Transparency == 0 then
+            hasMoney = true
+            break
+        end
+    end
+    
+    return hasGold or hasMoney
+end
+
+local function hasLootInRange(folder, character, range)
+    if not folder or not character or not character.PrimaryPart then return false end
+    local rootPos = character.PrimaryPart.Position
+    for _, mp in ipairs(folder:GetDescendants()) do
+        if mp:IsA("MeshPart") and mp.Transparency == 0 then
+            if (mp.Position - rootPos).Magnitude <= range then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function runMainRobberySequence()    
+    if handlePlayerHurt() then return false end
+    ensurePlayerInVehicle()
+    task.wait(0.2)
+    clickAtCoordinates(0.5, 0.9)
+    task.wait(0.2)
+    tweenTo(Locations.start)
+
+    if handlePlayerHurt() then return false end
+
+    local musikPart = Workspace.Robberies["Club Robbery"].Club.Door.Accessory.Black
+    local bankLight = Workspace.Robberies.BankRobbery.LightGreen.Light
+    local bankLight2 = Workspace.Robberies.BankRobbery.LightRed.Light
+
+    if musikPart.Rotation == Vector3.new(180, 0, 180) then
+        if handlePlayerHurt() then return false end
+        clickAtCoordinates(0.5, 0.9)
+        sendNotification("Club Robbery", "Safe is open, starting...")
+
+        if not hasDetonationItem() then
+            ensurePlayerInVehicle()
+            MoveToDealer()
+            task.wait(0.2)
+            RemoteEvents.buy:FireServer(DetonationItem, "Dealer")
+            task.wait(0.2)
+            RobberyStats.bombsPurchased = RobberyStats.bombsPurchased + 1
+        end
+
+        if handlePlayerHurt() then return false end
+        ensurePlayerInVehicle()
+        tweenTo(Locations.club.position)
+        JumpOut()
+        task.wait(0.2)
+        RemoteEvents.equip:FireServer(DetonationItem)
+        task.wait(0.2)
+        teleportPlayer(Locations.club.stand)
+        task.wait(0.3)
+        SpawnBomb()
+        task.wait(0.25)
+        RemoteEvents.bomb:FireServer()
+        State.isRobbing = true
+
+        enableInvisible()
+
+        teleportPlayer(Locations.club.safe)
+        task.wait(2.9)
+        teleportPlayer(Locations.club.tresor)
+
+        local safeFolder = Workspace.Robberies["Club Robbery"].Club
+        local itemsFolder = safeFolder:FindFirstChild("Items")
+        local moneyFolder = safeFolder:FindFirstChild("Money")
+
+        local collectStartTime = tick()
+        while tick() - collectStartTime < 25 do
+            if handlePlayerHurt() then State.isRobbing = false; break end
+            if isPoliceNearby() then sendNotification("Police Detected", "Aborting club robbery"); State.isRobbing = false; break end
+            
+            local hasItems = hasLootInRange(itemsFolder, Character, 15)
+            local hasMoney = hasLootInRange(moneyFolder, Character, 15)
+            
+            if not hasItems and not hasMoney then
+                break
+            end
+            
+            lootVisibleMeshParts(itemsFolder)
+            lootVisibleMeshParts(moneyFolder)
+            task.wait(0.5)
+        end
+
+        disableInvisible()
+
+        State.isRobbing = false
+        RobberyStats.clubRobbed = true
+        RobberyStats.safesRobbed = RobberyStats.safesRobbed + 1
+
+        if State.autoSellToggle then
+            if handlePlayerHurt() then return false end
+            ensurePlayerInVehicle()
+            MoveToDealer()
+            task.wait(0.2)
+            for _, item in ipairs({"MP5","Glock 17","Machete","Gold"}) do
+                RemoteEvents.sell:FireServer(item, "Dealer")
+            end
+            task.wait(0.2)
+            ensurePlayerInVehicle()
+            tweenTo(Locations.start)
+        end
+
+        if handlePlayerHurt() then return false end
+        ensurePlayerInVehicle()
+
+    else
+        sendNotification("Club Safe", "Closed, going to bank")
+        RobberyStats.alreadyRobbedIgnored = RobberyStats.alreadyRobbedIgnored + 1
+    end
+
+    if handlePlayerHurt() then return false end
+
+    if bankLight2.Enabled == false and bankLight.Enabled == true then
+        if handlePlayerHurt() then return false end
+        clickAtCoordinates(0.5, 0.9)
+        sendNotification("Bank Robbery", "Bank is open, starting...")
+
+        if not hasDetonationItem() then
+            ensurePlayerInVehicle()
+            MoveToDealer()
+            task.wait(0.2)
+            RemoteEvents.buy:FireServer(DetonationItem, "Dealer")
+            task.wait(0.2)
+            RobberyStats.bombsPurchased = RobberyStats.bombsPurchased + 1
+        end
+
+        tweenTo(Locations.bank)
+        task.wait(0.4)
+        JumpOut()
+        task.wait(0.45)
+
+        if handlePlayerHurt() then return false end
+        teleportToBankPosition(Vector3.new(-1242.367919921875, 7.749999046325684, 3144.705322265625))
+        task.wait(0.55)
+
+        local bombEquipped, equipAttempts = false, 0
+        while not bombEquipped and equipAttempts < 5 do
+            RemoteEvents.equip:FireServer(DetonationItem)
+            task.wait(0.5)
+            if Player.Character:FindFirstChild(DetonationItem) then
+                bombEquipped = true
+            else
+                equipAttempts = equipAttempts + 1
+                task.wait(0.3)
+            end
+        end
+
+        if not bombEquipped then
+            sendNotification("Error", "Failed to equip " .. DetonationItem)
+        else
+            SpawnBomb()
+            task.wait(0.25)
+            RemoteEvents.bomb:FireServer()
+            teleportToBankPosition(Vector3.new(-1246.291015625, 7.749999046325684, 3120.8505859375))
+            State.isRobbing = true
+
+            enableInvisible()
+
+            task.wait(3.15)
+
+            local hasLoot = checkBankHasLoot()
+            
+            if hasLoot then
+                local bankRobberyFolder = Workspace.Robberies.BankRobbery
+                local bankCollectPositions = {
+                    Vector3.new(-1249.897216796875, 7.723498821258545, 3121.068603515625),
+                    Vector3.new(-1231.8480224609375, 7.723498821258545, 3123.696044921875),
+                    Vector3.new(-1246.9058837890625, 7.723498821258545, 3102.236083984375),
+                    Vector3.new(-1234.6124267578125, 7.723498821258545, 3102.63134765625),
+                }
+
+                for _, position in ipairs(bankCollectPositions) do
+                    if handlePlayerHurt() then State.isRobbing = false; break end
+                    if isPoliceNearby() then sendNotification("Police Detected", "Aborting bank robbery"); State.isRobbing = false; break end
+                    
+                    teleportPlayer(position)
+                    
+                    local collectStartTime = tick()
+                    while tick() - collectStartTime < 6 do
+                        if handlePlayerHurt() then State.isRobbing = false; break end
+                        if isPoliceNearby() then State.isRobbing = false; break end
+                        
+                        local lootRemaining = hasLootInRange(bankRobberyFolder, Character, 9)
+                        
+                        if not lootRemaining then
+                            break
+                        end
+                        
+                        lootVisibleMeshParts(bankRobberyFolder)
+                        task.wait(0.5)
+                    end
+                    if not State.isRobbing then break end
+                end
+            end
+
+            disableInvisible()
+
+            State.isRobbing = false
+            RobberyStats.bankRobbed = true
+            RobberyStats.safesRobbed = RobberyStats.safesRobbed + 1
+
+            if handlePlayerHurt() then return false end
+            ensurePlayerInVehicle()
+
+            if State.autoSellToggle then
+                task.wait(0.2)
+                MoveToDealer()
+                task.wait(0.2)
+                RemoteEvents.sell:FireServer("Gold", "Dealer")
+                RemoteEvents.sell:FireServer("Gold", "Dealer")
+                RemoteEvents.sell:FireServer("Gold", "Dealer")
+                task.wait(0.2)
+                ensurePlayerInVehicle()
+            end
+        end
+    else
+        sendNotification("Bank", "Not open, going to jeweler")
+        RobberyStats.alreadyRobbedIgnored = RobberyStats.alreadyRobbedIgnored + 1
+    end
+
+    if handlePlayerHurt() then return false end
+
+    if RobberySelections.jewelerEnabled then
+        tweenTo(Locations.jeweler)
+        task.wait(0.5)
+
+        if not isPoliceNearby() and checkSafeRobStatus() then
+            if handlePlayerHurt() then return false end
+            sendNotification("Jeweler Robbery", "Jeweler is open, starting...")
+            ensurePlayerInVehicle()
+            MoveToDealer()
+            task.wait(0.2)
+            RemoteEvents.buy:FireServer(DetonationItem, "Dealer")
+            task.wait(0.2)
+            RobberyStats.bombsPurchased = RobberyStats.bombsPurchased + 1
+            tweenTo(Vector3.new(-423.84393310546875, 22.29579734802246, 3577.518798828125))
+            task.wait(0.4)
+            JumpOut()
+            task.wait(0.2)
+            teleportPlayer(Vector3.new(-435.2751770019531, 21.223411560058594, 3550.939453125))
+            RemoteEvents.equip:FireServer(DetonationItem)
+            task.wait(0.8)
+            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(90), 0) end
+            SpawnBomb()
+            task.wait(0.25)
+            RemoteEvents.bomb:FireServer()
+            State.isRobbing = true
+
+            enableInvisible()
+
+            task.wait(0.5)
+            teleportPlayer(Vector3.new(-425.7878112792969, 21.223413467407227, 3568.551513671875))
+            task.wait(3)
+            teleportPlayer(Vector3.new(-438.992919921875, 21.223411560058594, 3553.45166015625))
+            task.wait(0.5)
+            hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(90), 0) end
+            task.wait(0.5)
+
+            local jewelerSafeFolder = Workspace.Robberies:FindFirstChild("Jeweler Safe Robbery")
+            if jewelerSafeFolder then
+                local jewelerFolder = jewelerSafeFolder:FindFirstChild("Jeweler")
+                if jewelerFolder then
+                    local itemsFolder = jewelerFolder:FindFirstChild("Items")
+                    local moneyFolder = jewelerFolder:FindFirstChild("Money")
+
+                    local t = tick()
+                    while tick() - t < 25 do
+                        if handlePlayerHurt() then State.isRobbing = false; break end
+                        if isPoliceNearby() then sendNotification("Police Detected", "Aborting jeweler robbery"); State.isRobbing = false; break end
+                        
+                        local hasItems = hasLootInRange(itemsFolder, Character, 15)
+                        local hasMoney = hasLootInRange(moneyFolder, Character, 15)
+                        
+                        if not hasItems and not hasMoney then
+                            break
+                        end
+                        
+                        lootVisibleMeshParts(itemsFolder)
+                        lootVisibleMeshParts(moneyFolder)
+                        task.wait(0.5)
+                    end
+                    State.isRobbing = false
+                end
+            end
+
+            disableInvisible()
+
+            RobberyStats.jewelerRobbed = true
+            RobberyStats.safesRobbed = RobberyStats.safesRobbed + 1
+
+            if State.autoSellToggle then
+                if handlePlayerHurt() then return false end
+                ensurePlayerInVehicle()
+                task.wait(0.2)
+                MoveToDealer()
+                task.wait(0.2)
+                RemoteEvents.sell:FireServer("Gold", "Dealer")
+                RemoteEvents.sell:FireServer("Gold", "Dealer")
+                RemoteEvents.sell:FireServer("Gold", "Dealer")
+                task.wait(0.2)
+                ensurePlayerInVehicle()
+            end
+
+            return true
+        else
+            sendNotification("Jeweler", "Not open, rejoining...")
+            RobberyStats.alreadyRobbedIgnored = RobberyStats.alreadyRobbedIgnored + 1
+            return false
+        end
+    end
+
+    return true
+end
+
+local function FirstRejoin()
+    tweenTo(REJOIN_POSITION)
+    waitUntilNotWanted()
+    sendEndReport()
+    task.wait(0.5)
+    Player:Kick("NightSystem Autorob - ServerHop")
+    Rejoin()
+    task.wait(5)
+end
+
+game:GetService("CoreGui").DescendantAdded:Connect(function(d)
+    if d.Name == "ErrorPrompt" or d.Name == "ErrorTitle" then
+        task.wait(0.5)
+        Rejoin()
     end
 end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if player == Player then Rejoin() end
+end)
+
+RobberyStats.sessionStartTime = os.time()
+
+RemoteEvents.sell:FireServer("Bomb", "Dealer")
+clickAtCoordinates(0.5, 0.9)
+task.wait(2)
+if State.autorobToggle then
+    OpenCrimeApp()
+end
+AdminDtc()
+HealthCheck()
+
+while task.wait(0.1) do
+    if not State.autorobToggle then
+        continue
+    end
+    
+    if not RobberySelections.mainRobbery then
+        sendNotification("Warning", "No robberies selected! Please select at least one in Rob Selections.")
+        task.wait(5)
+        continue
+    end
+
+    if checkForBomb() then
+        sendNotification("Bomb Detected", "Waiting for explosion...")
+        task.wait(3)
+    end
+
+    if handlePlayerHurt() then break end
+
+    Character = Player.Character or Player.CharacterAdded:Wait()
+    HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+    local camera = Workspace.CurrentCamera
+
+    camera.CameraType = Enum.CameraType.Scriptable
+    local cameraLockConnection = RunService.RenderStepped:Connect(function()
+        if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
+        local rp = Character.HumanoidRootPart
+        camera.CFrame = CFrame.new(rp.Position - rp.CFrame.LookVector*5 + Vector3.new(0,4,0), rp.Position)
+        camera.FieldOfView = 80
+    end)
+
+    if RobberySelections.mainRobbery then
+        runMainRobberySequence()
+    end
+    
+    FirstRejoin()
+
+    if cameraLockConnection then
+        cameraLockConnection:Disconnect()
+        camera.CameraType = Enum.CameraType.Custom
+    end
+
+    task.wait(1)
+end
