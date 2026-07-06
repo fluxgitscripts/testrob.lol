@@ -156,6 +156,7 @@ local Window = OrionLib:MakeWindow({
 local tabs = {
     Info  = Window:MakeTab({ Name = "Information",  Icon = "rbxassetid://92667392992793" }),
     AutoRob  = Window:MakeTab({ Name = "AutoRob",  Icon = "rbxassetid://4814047006" }),
+    WebHook  = Window:MakeTab({ Name = "WebHook",  Icon = "rbxassetid://7948857489" }),
 }
 
 local function saveConfig()
@@ -220,7 +221,7 @@ local function sendNotification(title, content)
     })
 end
 
-tabs.AutoRob:AddSection({ Name = "AutoRob Script" })
+tabs.AutoRob:AddSection({ Name = "AutoRob" })
 tabs.AutoRob:AddToggle({
     Name     = "Autorob",
     Default  = State.autorobToggle,
@@ -248,7 +249,7 @@ tabs.AutoRob:AddToggle({
     end,
 })
 
-tabs.AutoRob:AddSection({ Name = "Toggle Settings" })
+tabs.AutoRob:AddSection({ Name = "Player Settings" })
 tabs.AutoRob:AddToggle({
     Name     = "Instant Player Teleport",
     Default  = State.fastTeleportToggle,
@@ -282,7 +283,7 @@ tabs.AutoRob:AddToggle({
     end,
 })
 
-tabs.AutoRob:AddSection({ Name = "Slider Settings" })
+tabs.AutoRob:AddSection({ Name = "General Settings" })
 tabs.AutoRob:AddSlider({
     Name      = "Vehicle Speed",
     Min       = 75,
@@ -323,7 +324,7 @@ tabs.AutoRob:AddSlider({
     end,
 })
 
-tabs.AutoRob:AddSection({ Name = "Dropdown Settings" })
+tabs.AutoRob:AddSection({ Name = "Detonation Settings" })
 tabs.AutoRob:AddDropdown({
     Name     = "Detonation Item",
     Default  = DetonationItem,
@@ -334,8 +335,9 @@ tabs.AutoRob:AddDropdown({
     end,
 })
 
-tabs.AutoRob:AddSection({ Name = "Other Settings" })
-tabs.AutoRob:AddTextbox({
+tabs.WebHook:AddSection({ Name = "Webhook Settings" })
+tabs.WebHook:AddParagraph("How It Works.", "The webhook will send a report at the end of the autorob session with statistics about the session, including bombs purchased, safes robbed, and current money. If you don't want to use this feature, leave the webhook URL blank.")
+tabs.WebHook:AddTextbox({
     Name          = "Webhook URL",
     Default       = WebhookUrl,
     TextDisappear = true,
@@ -344,6 +346,8 @@ tabs.AutoRob:AddTextbox({
         saveConfig()
     end,
 })
+
+tabs.AutoRob:AddSection({ Name = "Other Settings" })
 tabs.AutoRob:AddButton({
     Name = "Reset Config",
     Callback = function()
