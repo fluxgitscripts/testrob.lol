@@ -153,12 +153,9 @@ local Window = OrionLib:MakeWindow({
     Icon         = "rbxassetid://140458594132153",
 })
 
-local InfoGroup = Window:MakeTabGroup({ Name = "Script" })
-local AutorobGroup = Window:MakeTabGroup({ Name = "Autorob" })
-
 local tabs = {
-    Info  = InfoGroup:MakeTab({ Name = "Information",  Icon = "rbxassetid://92667392992793" }),
-    AutoRob  = AutorobGroup:MakeTab({ Name = "AutoRob",  Icon = "rbxassetid://4814047006" }),
+    Info  = Window:MakeTab({ Name = "Information",  Icon = "rbxassetid://92667392992793" }),
+    AutoRob  = Window:MakeTab({ Name = "AutoRob",  Icon = "rbxassetid://4814047006" }),
 }
 
 local function saveConfig()
