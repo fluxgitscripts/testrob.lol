@@ -250,7 +250,7 @@ tabs.AutoRob:AddToggle({
 
 tabs.AutoRob:AddSection({ Name = "Toggle Settings" })
 tabs.AutoRob:AddToggle({
-    Name     = "Fast Player Teleport",
+    Name     = "Instant Player Teleport",
     Default  = State.fastTeleportToggle,
     Callback = function(v)
         State.fastTeleportToggle = v
@@ -258,7 +258,7 @@ tabs.AutoRob:AddToggle({
     end,
 })
 tabs.AutoRob:AddToggle({
-    Name     = "Fast Vehicle Teleport",
+    Name     = "Instant Vehicle Teleport",
     Default  = State.autoVehicleTPToggle,
     Callback = function(v)
         State.autoVehicleTPToggle = v
@@ -274,7 +274,7 @@ tabs.AutoRob:AddToggle({
     end,
 })
 tabs.AutoRob:AddToggle({
-    Name     = "Invisibility",
+    Name     = "Invisibility [Emote]",
     Default  = InvisibleToggleEnabled,
     Callback = function(v)
         InvisibleToggleEnabled = v
@@ -297,24 +297,11 @@ tabs.AutoRob:AddSlider({
     end,
 })
 tabs.AutoRob:AddSlider({
-    Name      = "Player Speed",
-    Min       = 20,
-    Max       = 75,
-    Default   = Config.playerSpeed,
-    Color     = Color3.fromRGB(85, 170, 255),
-    Increment = 5,
-    ValueName = "speed",
-    Callback  = function(v)
-        Config.playerSpeed = v
-        saveConfig()
-    end,
-})
-tabs.AutoRob:AddSlider({
     Name      = "Low Health Threshold",
     Min       = 10,
     Max       = 100,
     Default   = Config.lowHealthThreshold,
-    Color     = Color3.fromRGB(255, 85, 85),
+    Color     = Color3.fromRGB(85, 170, 255),
     Increment = 5,
     ValueName = "health",
     Callback  = function(v)
@@ -382,8 +369,41 @@ tabs.AutoRob:AddButton({
 })
 
 tabs.Info:AddSection({ Name = "Information" })
-tabs.Info:AddParagraph("Warning", "Your device might not be powerful enough to handle this script smoothly. If you get ejected from your vehicle or kicked, lower your graphics settings before running again.")
-tabs.Info:AddParagraph("Important", "Always keep your vehicle speed set below the maximum speed your car is actually capable of reaching. Exceeding it may cause issues.")
+tabs.Info:AddParagraph("Info", "Lagging or getting kicked? Lower your graphics settings.")
+tabs.Info:AddParagraph("Important", "Keep speed below maximum to avoid issues.")
+tabs.Info:AddButton({
+    Name = "Join Discord",
+    Callback = function()
+        local success = pcall(function()
+            if request then
+                request({
+                    Url = "http://127.0.0.1:6463/rpc?v=1",
+                    Method = "POST",
+                    Headers = {
+                        ["Content-Type"] = "application/json",
+                        ["Origin"] = "https://discord.com"
+                    },
+                    Body = game:GetService("HttpService"):JSONEncode({
+                        cmd = "INVITE_BROWSER",
+                        args = {
+                            code = "ggeYfZD6Vm"
+                        },
+                        nonce = tostring(math.random(1, 1000000))
+                    })
+                })
+            end
+        end)
+        
+        if not success then
+            setclipboard("https://discord.gg/ggeYfZD6Vm")
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Discord Invite";
+                Text = "Link copied. Please paste it in your browser.";
+                Duration = 5;
+            })
+        end
+    end
+})
 
 local function saveCollisions()
     for _, p in ipairs(InvCharacter:GetDescendants()) do
