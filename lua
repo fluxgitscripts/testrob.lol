@@ -13,10 +13,10 @@ SetupAutoExecute()
 local OrionLib = loadstring(game:HttpGet("https://pastefy.app/2S5288c2/raw"))()
 
 local Window = OrionLib:MakeWindow({
-    Name         = "Night | discord.gg/DjvzXcqd5m ",
+    Name         = "Flux Autorob EMH | .gg/Sm848Rh6MK ",
     SaveConfig   = false,
     IntroEnabled = false,
-    ConfigFolder = "NightSystemCfgR",
+    ConfigFolder = "FluxConfigsAR",
     Icon         = "rbxassetid://140458594132153",
 })
 
@@ -143,13 +143,13 @@ Player.CharacterAdded:Connect(function(c)
     LastPosition = InvCharacter.PrimaryPart and InvCharacter.PrimaryPart.Position or Vector3.new()
 end)
 
-local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/NightSyste/NightUI/refs/heads/main/Night.lua"))()
+local OrionLib = loadstring(game:HttpGet("https://pastefy.app/2S5288c2/raw"))()
 
 local Window = OrionLib:MakeWindow({
-    Name         = "Night | .gg/DjvzXcqd5m ",
+    Name         = "Flux Autorob EMH | .gg/Sm848Rh6MK ",
     SaveConfig   = false,
     IntroEnabled = false,
-    ConfigFolder = "NightSystemCfgR",
+    ConfigFolder = "FluxConfigsAR",
     Icon         = "rbxassetid://140458594132153",
 })
 
@@ -179,7 +179,7 @@ local function saveConfig()
         DetonationItem         = DetonationItem,
         fastTeleportDistance   = Config.fastTeleportDistance,
     }
-    local configFileName = "NightSystemCfgR.json"
+    local configFileName = "FluxConfigsAR.json"
     if isfile then
         if isfile(configFileName) then delfile(configFileName) end
         writefile(configFileName, HttpService:JSONEncode(config))
@@ -187,7 +187,7 @@ local function saveConfig()
 end
 
 local function loadConfig()
-    local configFileName = "NightSystemCfgR.json"
+    local configFileName = "FluxConfigsAR.json"
     if isfile and isfile(configFileName) then
         local success, data = pcall(function()
             return HttpService:JSONDecode(readfile(configFileName))
@@ -363,7 +363,7 @@ tabs.AutoRob:AddTextbox({
 tabs.AutoRob:AddButton({
     Name = "Reset Config",
     Callback = function()
-        local configFileName = "NightSystemCfgR.json"
+        local configFileName = "FluxConfigsAR.json"
         if isfile and isfile(configFileName) then delfile(configFileName) end
         State.autorobToggle = true
         State.autoSellToggle = true
@@ -535,7 +535,7 @@ local function checkForStaffPlayers()
             local ok, isStaff = pcall(function() return isPlayerStaff(player) end)
             if ok and isStaff then
                 sendNotification("Mod Detected", "Mod " .. player.Name .. " detected.")
-                Player:Kick("Night System|Mod detected")
+                Player:Kick("Flux - Mod Detected")
                 return
             end
         end
@@ -551,7 +551,7 @@ local function AdminDtc()
             local ok, isStaff = pcall(function() return isPlayerStaff(player) end)
             if ok and isStaff then
                 sendNotification("Mod Detected", "Mod " .. player.Name .. " joined.")
-                Player:Kick("Night System|Mod detected")
+                Player:Kick("Flux - Mod Detected")
             end
         end)
         checkForStaffPlayers()
@@ -637,7 +637,7 @@ local function sendEndReport()
                     inline = true,
                 },
             },
-            footer = { text = "NightSystem" },
+            footer = { text = "Flux Autorob" },
             timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
         }},
     }
@@ -808,7 +808,7 @@ local function MoveToDealer()
         ensurePlayerInVehicle()
         tweenTo(REJOIN_POSITION)
         task.wait(1)
-        Player:Kick("NightSystem Autorob - ServerHop")
+        Player:Kick("Flux Autorob - ServerHop")
         return
     end
     local closest, shortest = nil, math.huge
@@ -823,7 +823,7 @@ local function MoveToDealer()
         tweenTo(Vector3.new(-1241.8756103515625, -23.776233673095703, 3719.95849609375))
         tweenTo(Vector3.new(-1241.78857421875, -358.98175048828125, 3718.096435546875))
         task.wait(0.5)
-        Player:Kick("NightSystem Autorob - ServerHop")
+        Player:Kick("Flux Autorob - ServerHop")
         return
     end
     tweenTo(closest.Position + Vector3.new(0, 5, 0))
@@ -853,7 +853,7 @@ local function HealthCheck()
             task.wait(0.5)
             sendEndReport()
             task.wait(0.3)
-            Player:Kick("NightSystem Autorob - ServerHop")
+            Player:Kick("Flux Autorob - ServerHop")
         end)
     end
     watchChar(Player.Character or Player.CharacterAdded:Wait())
@@ -958,7 +958,7 @@ local function Rejoin()
                     TeleportService:TeleportToPlaceInstance(7711635737, server.id, Player)
                 end)
                 task.wait(3)
-                Player:Kick("NightSystem Autorob - ServerHop")
+                Player:Kick("Flux Autorob - ServerHop")
                 return
             end
         end
@@ -969,7 +969,7 @@ local function Rejoin()
     end)
     
     task.wait(3)
-    Player:Kick("NightSystem Autorob - ServerHop")
+    Player:Kick("Flux Autorob - ServerHop")
 end
 
 local function OpenCrimeApp()
@@ -1386,7 +1386,7 @@ local function FirstRejoin()
     waitUntilNotWanted()
     sendEndReport()
     task.wait(0.5)
-    Player:Kick("NightSystem Autorob - ServerHop")
+    Player:Kick("Flux Autorob - ServerHop")
     Rejoin()
     task.wait(5)
 end
