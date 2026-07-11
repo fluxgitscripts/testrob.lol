@@ -36,8 +36,6 @@ local Player = Players.LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
-local RemoteFolder = ReplicatedStorage:WaitForChild("GpP")
-
 local GlobalEvents = game:GetService("ReplicatedStorage"):WaitForChild("shared/modules/globalNetworking@GlobalEvents")
 
 local RemoteEvents = {
