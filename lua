@@ -39,11 +39,11 @@ local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local GlobalEvents = game:GetService("ReplicatedStorage"):WaitForChild("shared/modules/globalNetworking@GlobalEvents")
 
 local RemoteEvents = {
-    rob = GlobalEvents.detonateBombs,
+    rob = GlobalEvents.placeBomb,
     sell = GlobalEvents.sellItem,
     equip = GlobalEvents.equipTool,
     buy = GlobalEvents.buyItem,
-    bomb = GlobalEvents.placeBomb,
+    bomb = GlobalEvents.detonateBombs,
     OpenPhone = GlobalEvents.equipTool,
     ClosePhone = GlobalEvents.unequipTool,
     hand = GlobalEvents.unequipTool,
