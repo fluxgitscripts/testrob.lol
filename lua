@@ -38,17 +38,26 @@ local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
 local GlobalEvents = game:GetService("ReplicatedStorage"):WaitForChild("shared/modules/globalNetworking@GlobalEvents")
 
+-- ============================================================
+--  REMOTEEVENTS (korrigiert und ergänzt)
+-- ============================================================
 local RemoteEvents = {
-    rob = GlobalEvents.placeBomb,
-    sell = GlobalEvents.sellItem,
-    equip = GlobalEvents.equipTool,
-    buy = GlobalEvents.buyItem,
-    bomb = GlobalEvents.detonateBombs,
-    OpenPhone = GlobalEvents.equipTool,
-    ClosePhone = GlobalEvents.unequipTool,
-    hand = GlobalEvents.unequipTool,
+    sell       = GlobalEvents.sellItem,
+    equip      = GlobalEvents.equipTool,
+    buy        = GlobalEvents.buyItem,
+    bomb       = GlobalEvents.detonateBombs,
+    openPhone  = GlobalEvents.equipTool,          -- Öffnen
+    closePhone = GlobalEvents.unequipTool,        -- Schließen
+    interact   = GlobalEvents.interact,           -- Interagieren (Sammeln)
+
+    -- Pfade (keine Remote-Events, aber für interact benötigt)
+    itemPath   = "shared/components/interactables/itemCollectInteractable@ItemCollectInteractable",
+    moneyPath  = "shared/components/interactables/moneyCollectInteractable@MoneyCollectInteractable",
 }
 
+-- ============================================================
+--  LOKATIONEN
+-- ============================================================
 local Locations = {
     start   = Vector3.new(-1248.078369140625, 5.846349239349365, 3339.4716796875),
     club = {
@@ -60,13 +69,6 @@ local Locations = {
     bank    = Vector3.new(-1280.954833984375, 5.372693061828613, 3166.63720703125),
     jeweler = Vector3.new(-1248.078369140625, 5.846349239349365, 3339.4716796875),
 }
-
-local Codes = {
-    money = "shared/components/interactables/moneyCollectInteractable@MoneyCollectInteractable",
-    items = "shared/components/interactables/itemCollectInteractable@ItemCollectInteractable",
-}
-
-local REJOIN_POSITION = Vector3.new(-1338.36, -23.71, 3778.24)
 
 local Config = {
     range                = 200,
@@ -114,25 +116,23 @@ local Stats = {
     crimemoney     = "N/A",
 }
 
+-- ============================================================
+--  INVISIBILITY (Emote)
+-- ============================================================
 cloneref = (type(cloneref) == "function") and cloneref or function(...) return ... end
-
 local InvServices = setmetatable({}, {
     __index = function(_, n)
         return cloneref(game:GetService(n))
     end
 })
-
 local InvRunService = InvServices.RunService
-
 local InvCharacter = Player.Character or Player.CharacterAdded:Wait()
 local InvHumanoid  = InvCharacter:WaitForChild("Humanoid")
-
 local InvisibleEnabled       = false
 local InvisibleToggleEnabled = true
 local CurrentTrack
 local LastPosition       = InvCharacter.PrimaryPart and InvCharacter.PrimaryPart.Position or Vector3.new()
 local OriginalCollisions = {}
-
 local InvRenderConnection
 local InvSteppedConnection
 local InputBlockConnection
@@ -143,6 +143,100 @@ Player.CharacterAdded:Connect(function(c)
     LastPosition = InvCharacter.PrimaryPart and InvCharacter.PrimaryPart.Position or Vector3.new()
 end)
 
+local function saveCollisions()
+    for _, p in ipairs(InvCharacter:GetDescendants()) do
+        if p:IsA("BasePart") then
+            OriginalCollisions[p] = p.CanCollide
+        end
+    end
+end
+
+local function disableCollisions()
+    for _, p in ipairs(InvCharacter:GetDescendants()) do
+        if p:IsA("BasePart") then
+            p.CanCollide = false
+        end
+    end
+end
+
+local function restoreCollisions()
+    for p, state in pairs(OriginalCollisions) do
+        if p and p.Parent then
+            p.CanCollide = state
+        end
+    end
+    OriginalCollisions = {}
+end
+
+local function startEmote()
+    if CurrentTrack then CurrentTrack:Stop(0) end
+    local animId = "rbxassetid://94292601332790"
+    pcall(function()
+        local objs = game:GetObjects(animId)
+        if objs and #objs > 0 and objs[1]:IsA("Animation") then
+            animId = objs[1].AnimationId
+        end
+    end)
+    local anim = Instance.new("Animation")
+    anim.AnimationId = animId
+    local track = InvHumanoid:LoadAnimation(anim)
+    track.Priority = Enum.AnimationPriority.Action4
+    track:Play(0.1, 1, 1)
+    CurrentTrack = track
+    if CurrentTrack.Length > 0 then CurrentTrack.TimePosition = 0 end
+    saveCollisions()
+    disableCollisions()
+end
+
+local function stopEmote()
+    if CurrentTrack then
+        CurrentTrack:Stop(0.1)
+        CurrentTrack = nil
+    end
+    restoreCollisions()
+end
+
+local function enableInvisible()
+    local invisibleEnabled = InvisibleToggleEnabled
+    if not invisibleEnabled then return end
+    if InvisibleEnabled then return end
+    InvisibleEnabled = true
+    startEmote()
+    InputBlockConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        local blocked = {
+            Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D,
+            Enum.KeyCode.Up, Enum.KeyCode.Down, Enum.KeyCode.Left, Enum.KeyCode.Right,
+            Enum.KeyCode.Space,
+        }
+        for _, key in ipairs(blocked) do
+            if input.KeyCode == key then return true end
+        end
+    end, true)
+    InvRenderConnection = InvRunService.RenderStepped:Connect(function()
+        if not InvisibleEnabled then return end
+        if CurrentTrack and CurrentTrack.IsPlaying and InvCharacter.PrimaryPart then
+            LastPosition = InvCharacter.PrimaryPart.Position
+        end
+    end)
+    InvSteppedConnection = InvRunService.Stepped:Connect(function()
+        if InvisibleEnabled and InvCharacter and InvCharacter.Parent then
+            disableCollisions()
+        end
+    end)
+end
+
+local function disableInvisible()
+    if not InvisibleEnabled then return end
+    InvisibleEnabled = false
+    stopEmote()
+    if InputBlockConnection then InputBlockConnection:Disconnect(); InputBlockConnection = nil end
+    if InvRenderConnection then InvRenderConnection:Disconnect(); InvRenderConnection = nil end
+    if InvSteppedConnection then InvSteppedConnection:Disconnect(); InvSteppedConnection = nil end
+end
+
+-- ============================================================
+--  GUI (Orion) – vollständig
+-- ============================================================
 local OrionLib = loadstring(game:HttpGet("https://pastefy.app/2S5288c2/raw"))()
 
 local Window = OrionLib:MakeWindow({
@@ -221,6 +315,7 @@ local function sendNotification(title, content)
     })
 end
 
+-- Tabs: AutoRob
 tabs.AutoRob:AddSection({ Name = "AutoRob" })
 tabs.AutoRob:AddToggle({
     Name     = "Autorob",
@@ -409,136 +504,9 @@ tabs.Info:AddButton({
     end
 })
 
-local function saveCollisions()
-    for _, p in ipairs(InvCharacter:GetDescendants()) do
-        if p:IsA("BasePart") then
-            OriginalCollisions[p] = p.CanCollide
-        end
-    end
-end
-
-local function disableCollisions()
-    for _, p in ipairs(InvCharacter:GetDescendants()) do
-        if p:IsA("BasePart") then
-            p.CanCollide = false
-        end
-    end
-end
-
-local function restoreCollisions()
-    for p, state in pairs(OriginalCollisions) do
-        if p and p.Parent then
-            p.CanCollide = state
-        end
-    end
-    OriginalCollisions = {}
-end
-
-local function startEmote()
-    if CurrentTrack then CurrentTrack:Stop(0) end
-    local animId = "rbxassetid://94292601332790"
-    pcall(function()
-        local objs = game:GetObjects(animId)
-        if objs and #objs > 0 and objs[1]:IsA("Animation") then
-            animId = objs[1].AnimationId
-        end
-    end)
-    local anim = Instance.new("Animation")
-    anim.AnimationId = animId
-    local track = InvHumanoid:LoadAnimation(anim)
-    track.Priority = Enum.AnimationPriority.Action4
-    track:Play(0.1, 1, 1)
-    CurrentTrack = track
-    if CurrentTrack.Length > 0 then CurrentTrack.TimePosition = 0 end
-    saveCollisions()
-    disableCollisions()
-end
-
-local function stopEmote()
-    if CurrentTrack then
-        CurrentTrack:Stop(0.1)
-        CurrentTrack = nil
-    end
-    restoreCollisions()
-end
-
-local function enableInvisible()
-    local invisibleEnabled = InvisibleToggleEnabled
-    if not invisibleEnabled then return end
-    if InvisibleEnabled then return end
-    InvisibleEnabled = true
-    startEmote()
-    InputBlockConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        local blocked = {
-            Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D,
-            Enum.KeyCode.Up, Enum.KeyCode.Down, Enum.KeyCode.Left, Enum.KeyCode.Right,
-            Enum.KeyCode.Space,
-        }
-        for _, key in ipairs(blocked) do
-            if input.KeyCode == key then return true end
-        end
-    end, true)
-    InvRenderConnection = InvRunService.RenderStepped:Connect(function()
-        if not InvisibleEnabled then return end
-        if CurrentTrack and CurrentTrack.IsPlaying and InvCharacter.PrimaryPart then
-            LastPosition = InvCharacter.PrimaryPart.Position
-        end
-    end)
-    InvSteppedConnection = InvRunService.Stepped:Connect(function()
-        if InvisibleEnabled and InvCharacter and InvCharacter.Parent then
-            disableCollisions()
-        end
-    end)
-end
-
-local function disableInvisible()
-    if not InvisibleEnabled then return end
-    InvisibleEnabled = false
-    stopEmote()
-    if InputBlockConnection then InputBlockConnection:Disconnect(); InputBlockConnection = nil end
-    if InvRenderConnection then InvRenderConnection:Disconnect(); InvRenderConnection = nil end
-    if InvSteppedConnection then InvSteppedConnection:Disconnect(); InvSteppedConnection = nil end
-end
-
-local function checkForBomb()
-    if not BombDetectionEnabled then return false end
-    if not Player.Character or not Player.Character:FindFirstChild("HumanoidRootPart") then return false end
-    local playerPos = Player.Character.HumanoidRootPart.Position
-    local foldersToCheck = {
-        workspace.Objects.Throwables.Bomb,
-        workspace.Objects.Throwables.Grenade,
-    }
-    for _, folder in ipairs(foldersToCheck) do
-        if folder then
-            for _, bombModel in ipairs(folder:GetChildren()) do
-                local shouldIgnore = false
-                local mainPart = bombModel:FindFirstChild("Main")
-                if mainPart and mainPart:IsA("BasePart") then
-                    local c = mainPart.Color
-                    if math.floor(c.R*255)==27 and math.floor(c.G*255)==42 and math.floor(c.B*255)==53 then
-                        shouldIgnore = true
-                    end
-                end
-                if not shouldIgnore then
-                    local bombPart = bombModel:FindFirstChild("Handle")
-                        or bombModel:FindFirstChild("MainPart")
-                        or bombModel:FindFirstChildWhichIsA("BasePart")
-                    if bombPart then
-                        if (bombPart.Position - playerPos).Magnitude <= 5 then return true end
-                    else
-                        for _, part in ipairs(bombModel:GetDescendants()) do
-                            if part:IsA("BasePart") and (part.Position - playerPos).Magnitude <= 5 then
-                                return true
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return false
-end
-
+-- ============================================================
+--  HILFSFUNKTIONEN (Teleport, Fahrzeug, Dealer, etc.)
+-- ============================================================
 local function isPlayerStaff(player)
     if player.UserId == game.CreatorId then return true end
     if game.CreatorType == Enum.CreatorType.Group then
@@ -819,22 +787,18 @@ end
 local function MoveToDealer()
     local plr = game:GetService("Players").LocalPlayer 
     local char = plr.Character or plr.CharacterAdded:Wait()
-    
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     
-    -- Überprüfen, ob der Spieler im Fahrzeug sitzt
     local vehicle = workspace:FindFirstChild("Vehicles") and workspace.Vehicles:FindFirstChild(plr.Name)
     if not vehicle then 
         sendNotification("Error", "No vehicle found.")
         return 
     end
     
-    -- Den neuen Dealer-Ordner im ReplicatedStorage suchen
     local dealersFolder = game:GetService("ReplicatedStorage"):FindFirstChild("DealerNavigationTargets")
     if not dealersFolder then
         sendNotification("Error", "Dealers not found in ReplicatedStorage.")
-        -- Fallback-Logik (Serverhop), falls nichts gefunden wird
         OpenCrimeApp()
         task.wait(0.75)
         sendEndReport()
@@ -848,8 +812,6 @@ local function MoveToDealer()
 
     local closestPos = nil
     local short = math.huge
-    
-    -- Den nächsten Dealer-Punkt berechnen
     for _, target in pairs(dealersFolder:GetChildren()) do
         if target:IsA("BasePart") then
             local dist = (root.Position - target.Position).Magnitude
@@ -860,7 +822,6 @@ local function MoveToDealer()
         end
     end
     
-    -- Zum Dealer teleportieren (inkl. Offset)
     if closestPos then
         tweenTo(closestPos + Vector3.new(0, 5, 0))
     else
@@ -873,7 +834,6 @@ local function MoveToDealer()
 end
 
 local HealthTripwire = false
-
 local function HealthCheck()
     local function watchChar(char)
         local humanoid = char:WaitForChild("Humanoid")
@@ -884,7 +844,7 @@ local function HealthCheck()
                 State.isRobbing = false
                 disableInvisible()
                 sendNotification("Low Health", "Server hopping...")
-              FirstRejoin()
+                FirstRejoin()
             end
         end)
         humanoid.Died:Connect(function()
@@ -906,6 +866,142 @@ local function HealthCheck()
     end)
 end
 
+local function checkForBomb()
+    if not BombDetectionEnabled then return false end
+    if not Player.Character or not Player.Character:FindFirstChild("HumanoidRootPart") then return false end
+    local playerPos = Player.Character.HumanoidRootPart.Position
+    local foldersToCheck = {
+        workspace.Objects.Throwables.Bomb,
+        workspace.Objects.Throwables.Grenade,
+    }
+    for _, folder in ipairs(foldersToCheck) do
+        if folder then
+            for _, bombModel in ipairs(folder:GetChildren()) do
+                local shouldIgnore = false
+                local mainPart = bombModel:FindFirstChild("Main")
+                if mainPart and mainPart:IsA("BasePart") then
+                    local c = mainPart.Color
+                    if math.floor(c.R*255)==27 and math.floor(c.G*255)==42 and math.floor(c.B*255)==53 then
+                        shouldIgnore = true
+                    end
+                end
+                if not shouldIgnore then
+                    local bombPart = bombModel:FindFirstChild("Handle")
+                        or bombModel:FindFirstChild("MainPart")
+                        or bombModel:FindFirstChildWhichIsA("BasePart")
+                    if bombPart then
+                        if (bombPart.Position - playerPos).Magnitude <= 5 then return true end
+                    else
+                        for _, part in ipairs(bombModel:GetDescendants()) do
+                            if part:IsA("BasePart") and (part.Position - playerPos).Magnitude <= 5 then
+                                return true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function OpenCrimeApp()
+    if not State.autorobToggle then return false end
+    local pg = Player:WaitForChild("PlayerGui")
+    RemoteEvents.openPhone:FireServer("Phone")
+    local gui
+    local attempts = 0
+    repeat
+        attempts = attempts + 1
+        for _, g in ipairs(pg:GetChildren()) do
+            if g:IsA("ScreenGui") and g.DisplayOrder == 29 and g.IgnoreGuiInset == true and g.ResetOnSpawn == false then
+                gui = g
+                break
+            end
+        end
+        if not gui then task.wait(0.5) end
+    until gui or attempts >= 30
+    if not gui then
+        RemoteEvents.openPhone:FireServer("Phone")
+        task.wait(1)
+        attempts = 0
+        repeat
+            attempts = attempts + 1
+            for _, g in ipairs(pg:GetChildren()) do
+                if g:IsA("ScreenGui") and g.DisplayOrder == 29 and g.IgnoreGuiInset == true and g.ResetOnSpawn == false then
+                    gui = g
+                    break
+                end
+            end
+            if not gui then task.wait(0.5) end
+        until gui or attempts >= 30
+    end
+    if not gui then RemoteEvents.closePhone:FireServer(); return false end
+    local frame
+    attempts = 0
+    repeat
+        attempts = attempts + 1
+        for _, obj in ipairs(gui:GetDescendants()) do
+            if obj:IsA("Frame") then
+                local pos = obj.Position
+                if math.abs(pos.X.Scale - 0.005) < 0.005 and math.abs(pos.Y.Scale - 0.995) < 0.005 and obj.AnchorPoint.Y == 1 then
+                    frame = obj
+                    break
+                end
+            end
+        end
+        if not frame then task.wait(0.5) end
+    until frame or attempts >= 20
+    if not frame then RemoteEvents.closePhone:FireServer(); return false end
+    task.wait(0.3)
+    local btn
+    for _, obj in ipairs(frame:GetDescendants()) do
+        if obj.Name == "Criminal" then btn = obj; break end
+    end
+    if not btn then
+        for _, obj in ipairs(frame:GetDescendants()) do
+            if (obj:IsA("TextButton") or obj:IsA("TextLabel")) and obj.Text == "Criminal" then btn = obj; break end
+        end
+    end
+    if not btn then RemoteEvents.closePhone:FireServer(); return false end
+    local p = btn.AbsolutePosition
+    local s = btn.AbsoluteSize
+    VirtualInputManager:SendMouseButtonEvent(p.X + s.X/2, p.Y + s.Y/2, 0, true, game, 1)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(p.X + s.X/2, p.Y + s.Y/2, 0, false, game, 1)
+    task.wait(0.5)
+    RemoteEvents.closePhone:FireServer()
+    return true
+end
+
+local function checkBankHasLoot()
+    local goldFolder = workspace.Robberies.BankRobbery.Gold
+    local moneyFolder = workspace.Robberies.BankRobbery.Money
+    local hasGold = false
+    local hasMoney = false
+    for _, item in ipairs(goldFolder:GetChildren()) do
+        if item:IsA("MeshPart") and item.Transparency == 0 then hasGold = true; break end
+    end
+    for _, item in ipairs(moneyFolder:GetChildren()) do
+        if item:IsA("MeshPart") and item.Transparency == 0 then hasMoney = true; break end
+    end
+    return hasGold or hasMoney
+end
+
+local function hasLootInRange(folder, character, range)
+    if not folder or not character or not character.PrimaryPart then return false end
+    local rootPos = character.PrimaryPart.Position
+    for _, mp in ipairs(folder:GetDescendants()) do
+        if mp:IsA("MeshPart") and mp.Transparency == 0 then
+            if (mp.Position - rootPos).Magnitude <= range then return true end
+        end
+    end
+    return false
+end
+
+-- ============================================================
+--  KORRIGIERTE SAMMELFUNKTION (verwendet RemoteEvents.interact)
+-- ============================================================
 local function lootVisibleMeshParts(folder)
     if not folder then return end
     if isPlayerHurt() then
@@ -936,16 +1032,19 @@ local function lootVisibleMeshParts(folder)
         if mp.Transparency == 0 and (mp.Position - currentHRP.Position).Magnitude <= Config.range then
             State.collected[mp] = true
             task.spawn(function()
-                local code = mp.Parent and mp.Parent.Name == "Money" and Codes.money or Codes.items
-                RemoteEvents.rob:FireServer(mp, code, true)
+                -- Pfad auswählen: Money oder Items
+                local path = mp.Parent and mp.Parent.Name == "Money" and RemoteEvents.moneyPath or RemoteEvents.itemPath
+                RemoteEvents.interact:FireServer(mp, path, "start")
                 task.wait(Config.proximityPromptTime)
-                RemoteEvents.rob:FireServer(mp, code, false)
+                RemoteEvents.interact:FireServer(mp, path, "stop")
                 if mp and mp.Parent then State.collected[mp] = nil end
             end)
             task.wait(0.05)
         end
     end
 end
+
+local REJOIN_POSITION = Vector3.new(-1338.36, -23.71, 3778.24)
 
 local function handlePlayerHurt()
     if isPlayerHurt() then
@@ -993,7 +1092,6 @@ local function Rejoin()
     local ok, data = pcall(function()
         return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/7711635737/servers/Public?sortOrder=Asc&limit=100"))
     end)
-    
     if ok and data and data.data then
         for _, server in ipairs(data.data) do
             if server.id ~= game.JobId and server.playing < server.maxPlayers then
@@ -1006,122 +1104,26 @@ local function Rejoin()
             end
         end
     end
-    
     pcall(function()
         TeleportService:Teleport(7711635737, Player)
     end)
-    
     task.wait(3)
     Player:Kick("Flux Autorob - ServerHop")
 end
 
-local function OpenCrimeApp()
-    if not State.autorobToggle then return false end
-    local pg = Player:WaitForChild("PlayerGui")
-    RemoteEvents.OpenPhone:FireServer("Phone")
-    local gui
-    local attempts = 0
-    repeat
-        attempts = attempts + 1
-        for _, g in ipairs(pg:GetChildren()) do
-            if g:IsA("ScreenGui") and g.DisplayOrder == 29 and g.IgnoreGuiInset == true and g.ResetOnSpawn == false then
-                gui = g
-                break
-            end
-        end
-        if not gui then task.wait(0.5) end
-    until gui or attempts >= 30
-    if not gui then
-        RemoteEvents.OpenPhone:FireServer("Phone")
-        task.wait(1)
-        attempts = 0
-        repeat
-            attempts = attempts + 1
-            for _, g in ipairs(pg:GetChildren()) do
-                if g:IsA("ScreenGui") and g.DisplayOrder == 29 and g.IgnoreGuiInset == true and g.ResetOnSpawn == false then
-                    gui = g
-                    break
-                end
-            end
-            if not gui then task.wait(0.5) end
-        until gui or attempts >= 30
-    end
-    if not gui then RemoteEvents.ClosePhone:FireServer(); return false end
-    local frame
-    attempts = 0
-    repeat
-        attempts = attempts + 1
-        for _, obj in ipairs(gui:GetDescendants()) do
-            if obj:IsA("Frame") then
-                local pos = obj.Position
-                if math.abs(pos.X.Scale - 0.005) < 0.005 and math.abs(pos.Y.Scale - 0.995) < 0.005 and obj.AnchorPoint.Y == 1 then
-                    frame = obj
-                    break
-                end
-            end
-        end
-        if not frame then task.wait(0.5) end
-    until frame or attempts >= 20
-    if not frame then RemoteEvents.ClosePhone:FireServer(); return false end
-    task.wait(0.3)
-    local btn
-    for _, obj in ipairs(frame:GetDescendants()) do
-        if obj.Name == "Criminal" then btn = obj; break end
-    end
-    if not btn then
-        for _, obj in ipairs(frame:GetDescendants()) do
-            if (obj:IsA("TextButton") or obj:IsA("TextLabel")) and obj.Text == "Criminal" then btn = obj; break end
-        end
-    end
-    if not btn then RemoteEvents.ClosePhone:FireServer(); return false end
-    local p = btn.AbsolutePosition
-    local s = btn.AbsoluteSize
-    VirtualInputManager:SendMouseButtonEvent(p.X + s.X/2, p.Y + s.Y/2, 0, true, game, 1)
-    task.wait(0.1)
-    VirtualInputManager:SendMouseButtonEvent(p.X + s.X/2, p.Y + s.Y/2, 0, false, game, 1)
+local function FirstRejoin()
+    tweenTo(REJOIN_POSITION)
+    waitUntilNotWanted()
+    sendEndReport()
     task.wait(0.5)
-    RemoteEvents.ClosePhone:FireServer()
-    return true
+    Player:Kick("Flux Autorob - ServerHop")
+    Rejoin()
+    task.wait(5)
 end
 
-
-local function checkBankHasLoot()
-    local goldFolder = workspace.Robberies.BankRobbery.Gold
-    local moneyFolder = workspace.Robberies.BankRobbery.Money
-    
-    local hasGold = false
-    local hasMoney = false
-    
-    for _, item in ipairs(goldFolder:GetChildren()) do
-        if item:IsA("MeshPart") and item.Transparency == 0 then
-            hasGold = true
-            break
-        end
-    end
-    
-    for _, item in ipairs(moneyFolder:GetChildren()) do
-        if item:IsA("MeshPart") and item.Transparency == 0 then
-            hasMoney = true
-            break
-        end
-    end
-    
-    return hasGold or hasMoney
-end
-
-local function hasLootInRange(folder, character, range)
-    if not folder or not character or not character.PrimaryPart then return false end
-    local rootPos = character.PrimaryPart.Position
-    for _, mp in ipairs(folder:GetDescendants()) do
-        if mp:IsA("MeshPart") and mp.Transparency == 0 then
-            if (mp.Position - rootPos).Magnitude <= range then
-                return true
-            end
-        end
-    end
-    return false
-end
-
+-- ============================================================
+--  HAUPTROBBERY-SEQUENZ
+-- ============================================================
 local function runMainRobberySequence()    
     if handlePlayerHurt() then return false end
     ensurePlayerInVehicle()
@@ -1182,9 +1184,7 @@ local function runMainRobberySequence()
             local hasItems = hasLootInRange(itemsFolder, Character, 15)
             local hasMoney = hasLootInRange(moneyFolder, Character, 15)
             
-            if not hasItems and not hasMoney then
-                break
-            end
+            if not hasItems and not hasMoney then break end
             
             lootVisibleMeshParts(itemsFolder)
             lootVisibleMeshParts(moneyFolder)
@@ -1291,10 +1291,7 @@ local function runMainRobberySequence()
                         if isPoliceNearby() then State.isRobbing = false; break end
                         
                         local lootRemaining = hasLootInRange(bankRobberyFolder, Character, 9)
-                        
-                        if not lootRemaining then
-                            break
-                        end
+                        if not lootRemaining then break end
                         
                         lootVisibleMeshParts(bankRobberyFolder)
                         task.wait(0.5)
@@ -1382,10 +1379,7 @@ local function runMainRobberySequence()
                         
                         local hasItems = hasLootInRange(itemsFolder, Character, 15)
                         local hasMoney = hasLootInRange(moneyFolder, Character, 15)
-                        
-                        if not hasItems and not hasMoney then
-                            break
-                        end
+                        if not hasItems and not hasMoney then break end
                         
                         lootVisibleMeshParts(itemsFolder)
                         lootVisibleMeshParts(moneyFolder)
@@ -1424,16 +1418,9 @@ local function runMainRobberySequence()
     return true
 end
 
-local function FirstRejoin()
-    tweenTo(REJOIN_POSITION)
-    waitUntilNotWanted()
-    sendEndReport()
-    task.wait(0.5)
-    Player:Kick("Flux Autorob - ServerHop")
-    Rejoin()
-    task.wait(5)
-end
-
+-- ============================================================
+--  HAUPTSCHLEIFE
+-- ============================================================
 game:GetService("CoreGui").DescendantAdded:Connect(function(d)
     if d.Name == "ErrorPrompt" or d.Name == "ErrorTitle" then
         task.wait(0.5)
