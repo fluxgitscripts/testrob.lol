@@ -39,18 +39,16 @@ local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local GlobalEvents = game:GetService("ReplicatedStorage"):WaitForChild("shared/modules/globalNetworking@GlobalEvents")
 
 -- ============================================================
---  REMOTEEVENTS (korrigiert und ergänzt)
+--  REMOTEEVENTS (korrigiert)
 -- ============================================================
 local RemoteEvents = {
     sell       = GlobalEvents.sellItem,
     equip      = GlobalEvents.equipTool,
     buy        = GlobalEvents.buyItem,
     bomb       = GlobalEvents.detonateBombs,
-    openPhone  = GlobalEvents.equipTool,          -- Öffnen
-    closePhone = GlobalEvents.unequipTool,        -- Schließen
-    interact   = GlobalEvents.interact,           -- Interagieren (Sammeln)
-
-    -- Pfade (keine Remote-Events, aber für interact benötigt)
+    openPhone  = GlobalEvents.equipTool,
+    closePhone = GlobalEvents.unequipTool,
+    interact   = GlobalEvents.interact,
     itemPath   = "shared/components/interactables/itemCollectInteractable@ItemCollectInteractable",
     moneyPath  = "shared/components/interactables/moneyCollectInteractable@MoneyCollectInteractable",
 }
@@ -70,6 +68,9 @@ local Locations = {
     jeweler = Vector3.new(-1248.078369140625, 5.846349239349365, 3339.4716796875),
 }
 
+-- Pfade nicht mehr als Codes, sondern direkt in RemoteEvents
+local REJOIN_POSITION = Vector3.new(-1338.36, -23.71, 3778.24)
+
 local Config = {
     range                = 200,
     proximityPromptTime  = 2.5,
@@ -81,9 +82,10 @@ local Config = {
     selectedRadarPosition = "position1",
 }
 
+-- RobberySelections: Nur noch mainRobbery (Bank & Club), Jeweler deaktiviert
 local RobberySelections = {
     mainRobbery = true,
-    jewelerEnabled = true,
+    jewelerEnabled = false,   -- immer aus
 }
 
 local State = {
@@ -235,7 +237,7 @@ local function disableInvisible()
 end
 
 -- ============================================================
---  GUI (Orion) – vollständig
+--  GUI (Orion) – OHNE DROPDOWN FÜR JEWELER
 -- ============================================================
 local OrionLib = loadstring(game:HttpGet("https://pastefy.app/2S5288c2/raw"))()
 
@@ -261,7 +263,6 @@ local function saveConfig()
         adminDetectionToggle   = State.adminDetectionToggle,
         autoVehicleTPToggle    = State.autoVehicleTPToggle,
         mainRobbery            = RobberySelections.mainRobbery,
-        jewelerEnabled         = RobberySelections.jewelerEnabled,
         VehicleSpeedMultiplier = VehicleSpeedMultiplier,
         playerSpeed            = Config.playerSpeed,
         lowHealthThreshold     = Config.lowHealthThreshold,
@@ -291,7 +292,7 @@ local function loadConfig()
             if data.adminDetectionToggle ~= nil then State.adminDetectionToggle = data.adminDetectionToggle end
             if data.autoVehicleTPToggle ~= nil then State.autoVehicleTPToggle = data.autoVehicleTPToggle end
             if data.mainRobbery ~= nil then RobberySelections.mainRobbery = data.mainRobbery end
-            if data.jewelerEnabled ~= nil then RobberySelections.jewelerEnabled = data.jewelerEnabled end
+            -- jewelerEnabled wird nicht mehr geladen, bleibt false
             if data.VehicleSpeedMultiplier ~= nil then VehicleSpeedMultiplier = data.VehicleSpeedMultiplier end
             if data.playerSpeed ~= nil then Config.playerSpeed = data.playerSpeed end
             if data.lowHealthThreshold ~= nil then Config.lowHealthThreshold = data.lowHealthThreshold end
@@ -315,7 +316,7 @@ local function sendNotification(title, content)
     })
 end
 
--- Tabs: AutoRob
+-- AutoRob Tab
 tabs.AutoRob:AddSection({ Name = "AutoRob" })
 tabs.AutoRob:AddToggle({
     Name     = "Autorob",
@@ -325,16 +326,10 @@ tabs.AutoRob:AddToggle({
         saveConfig()
     end,
 })
-tabs.AutoRob:AddDropdown({
-    Name    = "Select Robberies",
-    Default = RobberySelections.jewelerEnabled and "Bank & Club & Jeweler" or "Bank & Club",
-    Options = { "Bank & Club", "Bank & Club & Jeweler" },
-    Callback = function(v)
-        RobberySelections.mainRobbery = true
-        RobberySelections.jewelerEnabled = (v == "Bank & Club & Jeweler")
-        saveConfig()
-    end,
-})
+
+-- Statt Dropdown jetzt ein fester Hinweis
+tabs.AutoRob:AddParagraph("Robberies", "Only Bank & Club – Jeweler disabled")
+
 tabs.AutoRob:AddToggle({
     Name     = "Autosell Items",
     Default  = State.autoSellToggle,
@@ -505,7 +500,7 @@ tabs.Info:AddButton({
 })
 
 -- ============================================================
---  HILFSFUNKTIONEN (Teleport, Fahrzeug, Dealer, etc.)
+--  HILFSFUNKTIONEN (unverändert bis auf RemoteEvents)
 -- ============================================================
 local function isPlayerStaff(player)
     if player.UserId == game.CreatorId then return true end
@@ -789,13 +784,11 @@ local function MoveToDealer()
     local char = plr.Character or plr.CharacterAdded:Wait()
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
-    
     local vehicle = workspace:FindFirstChild("Vehicles") and workspace.Vehicles:FindFirstChild(plr.Name)
     if not vehicle then 
         sendNotification("Error", "No vehicle found.")
         return 
     end
-    
     local dealersFolder = game:GetService("ReplicatedStorage"):FindFirstChild("DealerNavigationTargets")
     if not dealersFolder then
         sendNotification("Error", "Dealers not found in ReplicatedStorage.")
@@ -809,7 +802,6 @@ local function MoveToDealer()
         Player:Kick("Flux Autorob - ServerHop")
         return
     end
-
     local closestPos = nil
     local short = math.huge
     for _, target in pairs(dealersFolder:GetChildren()) do
@@ -821,7 +813,6 @@ local function MoveToDealer()
             end
         end
     end
-    
     if closestPos then
         tweenTo(closestPos + Vector3.new(0, 5, 0))
     else
@@ -1000,7 +991,7 @@ local function hasLootInRange(folder, character, range)
 end
 
 -- ============================================================
---  KORRIGIERTE SAMMELFUNKTION (verwendet RemoteEvents.interact)
+--  SAMMELFUNKTION (mit RemoteEvents.interact)
 -- ============================================================
 local function lootVisibleMeshParts(folder)
     if not folder then return end
@@ -1032,7 +1023,6 @@ local function lootVisibleMeshParts(folder)
         if mp.Transparency == 0 and (mp.Position - currentHRP.Position).Magnitude <= Config.range then
             State.collected[mp] = true
             task.spawn(function()
-                -- Pfad auswählen: Money oder Items
                 local path = mp.Parent and mp.Parent.Name == "Money" and RemoteEvents.moneyPath or RemoteEvents.itemPath
                 RemoteEvents.interact:FireServer(mp, path, "start")
                 task.wait(Config.proximityPromptTime)
@@ -1043,8 +1033,6 @@ local function lootVisibleMeshParts(folder)
         end
     end
 end
-
-local REJOIN_POSITION = Vector3.new(-1338.36, -23.71, 3778.24)
 
 local function handlePlayerHurt()
     if isPlayerHurt() then
@@ -1122,7 +1110,7 @@ local function FirstRejoin()
 end
 
 -- ============================================================
---  HAUPTROBBERY-SEQUENZ
+--  HAUPTROBBERY (nur Bank & Club)
 -- ============================================================
 local function runMainRobberySequence()    
     if handlePlayerHurt() then return false end
@@ -1138,6 +1126,7 @@ local function runMainRobberySequence()
     local bankLight = Workspace.Robberies.BankRobbery.LightGreen.Light
     local bankLight2 = Workspace.Robberies.BankRobbery.LightRed.Light
 
+    -- CLUB
     if musikPart.Rotation == Vector3.new(180, 0, 180) then
         if handlePlayerHurt() then return false end
         clickAtCoordinates(0.5, 0.9)
@@ -1212,7 +1201,6 @@ local function runMainRobberySequence()
 
         if handlePlayerHurt() then return false end
         ensurePlayerInVehicle()
-
     else
         sendNotification("Club Safe", "Closed, going to bank")
         RobberyStats.alreadyRobbedIgnored = RobberyStats.alreadyRobbedIgnored + 1
@@ -1220,6 +1208,7 @@ local function runMainRobberySequence()
 
     if handlePlayerHurt() then return false end
 
+    -- BANK
     if bankLight2.Enabled == false and bankLight.Enabled == true then
         if handlePlayerHurt() then return false end
         clickAtCoordinates(0.5, 0.9)
@@ -1321,100 +1310,13 @@ local function runMainRobberySequence()
             end
         end
     else
-        sendNotification("Bank", "Not open, going to jeweler")
+        sendNotification("Bank", "Not open, rejoining...")
         RobberyStats.alreadyRobbedIgnored = RobberyStats.alreadyRobbedIgnored + 1
+        -- Kein Juwelier mehr – wir springen direkt zum Rejoin
+        return false
     end
 
-    if handlePlayerHurt() then return false end
-
-    if RobberySelections.jewelerEnabled then
-        tweenTo(Locations.jeweler)
-        task.wait(0.5)
-
-        if not isPoliceNearby() and checkSafeRobStatus() then
-            if handlePlayerHurt() then return false end
-            sendNotification("Jeweler Robbery", "Jeweler is open, starting...")
-            ensurePlayerInVehicle()
-            MoveToDealer()
-            task.wait(0.2)
-            RemoteEvents.buy:FireServer(DetonationItem, "Dealer")
-            task.wait(0.2)
-            RobberyStats.bombsPurchased = RobberyStats.bombsPurchased + 1
-            tweenTo(Vector3.new(-423.84393310546875, 22.29579734802246, 3577.518798828125))
-            task.wait(0.4)
-            JumpOut()
-            task.wait(0.2)
-            teleportPlayer(Vector3.new(-435.2751770019531, 21.223411560058594, 3550.939453125))
-            RemoteEvents.equip:FireServer(DetonationItem)
-            task.wait(0.8)
-            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(90), 0) end
-            SpawnBomb()
-            task.wait(0.25)
-            RemoteEvents.bomb:FireServer()
-            State.isRobbing = true
-
-            enableInvisible()
-
-            task.wait(0.5)
-            teleportPlayer(Vector3.new(-425.7878112792969, 21.223413467407227, 3568.551513671875))
-            task.wait(3)
-            teleportPlayer(Vector3.new(-438.992919921875, 21.223411560058594, 3553.45166015625))
-            task.wait(0.5)
-            hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(90), 0) end
-            task.wait(0.5)
-
-            local jewelerSafeFolder = Workspace.Robberies:FindFirstChild("Jeweler Safe Robbery")
-            if jewelerSafeFolder then
-                local jewelerFolder = jewelerSafeFolder:FindFirstChild("Jeweler")
-                if jewelerFolder then
-                    local itemsFolder = jewelerFolder:FindFirstChild("Items")
-                    local moneyFolder = jewelerFolder:FindFirstChild("Money")
-
-                    local t = tick()
-                    while tick() - t < 25 do
-                        if handlePlayerHurt() then State.isRobbing = false; break end
-                        if isPoliceNearby() then sendNotification("Police Detected", "Aborting jeweler robbery"); State.isRobbing = false; break end
-                        
-                        local hasItems = hasLootInRange(itemsFolder, Character, 15)
-                        local hasMoney = hasLootInRange(moneyFolder, Character, 15)
-                        if not hasItems and not hasMoney then break end
-                        
-                        lootVisibleMeshParts(itemsFolder)
-                        lootVisibleMeshParts(moneyFolder)
-                        task.wait(0.5)
-                    end
-                    State.isRobbing = false
-                end
-            end
-
-            disableInvisible()
-
-            RobberyStats.jewelerRobbed = true
-            RobberyStats.safesRobbed = RobberyStats.safesRobbed + 1
-
-            if State.autoSellToggle then
-                if handlePlayerHurt() then return false end
-                ensurePlayerInVehicle()
-                task.wait(0.2)
-                MoveToDealer()
-                task.wait(0.2)
-                RemoteEvents.sell:FireServer("Gold", "Dealer")
-                RemoteEvents.sell:FireServer("Gold", "Dealer")
-                RemoteEvents.sell:FireServer("Gold", "Dealer")
-                task.wait(0.2)
-                ensurePlayerInVehicle()
-            end
-
-            return true
-        else
-            sendNotification("Jeweler", "Not open, rejoining...")
-            RobberyStats.alreadyRobbedIgnored = RobberyStats.alreadyRobbedIgnored + 1
-            return false
-        end
-    end
-
+    -- JEWELER WURDE ENTFERNT – hier wird nichts mehr ausgeführt
     return true
 end
 
